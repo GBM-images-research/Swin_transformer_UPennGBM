@@ -611,7 +611,7 @@ def main(config_train):
     # im_v = val_set[0]
     # print(im_v["image"].shape)
     # print(im_v["label"].shape)
-
+    # return
     ##########################################################
     # Comenzar entrenamiento
     ##########################################################
