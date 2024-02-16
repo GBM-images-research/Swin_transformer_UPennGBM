@@ -239,7 +239,7 @@ config_train = SimpleNamespace(
     infer_overlap=infer_overlap,
     max_epochs=max_epochs,
     val_every=val_every,
-    GT="nroi + froi ver solo edema",  # modifica para eliminar edema
+    GT="nroi + froi",  # modifica para eliminar edema
 )
 
 #############################
@@ -252,7 +252,7 @@ api_key = os.environ.get("WANDB_API_KEY")
 wandb.login(key=api_key)
 
 # create a wandb run
-run = wandb.init(project="Swin_UPENN", job_type="train", config=config_train)
+run = wandb.init(project="Swin_UPENN_106cases", job_type="train", config=config_train)
 
 # we pass the config back from W&B
 config_train = wandb.config
@@ -320,7 +320,7 @@ train_transform = transforms.Compose(
     [
         transforms.LoadImaged(keys=["image", "label"]),
         # transforms.ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
-        masked(keys=["image", "label"]),
+        # masked(keys=["image", "label"]),
         ConvertToMultiChannel_with_infiltration(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
@@ -344,7 +344,7 @@ val_transform = transforms.Compose(
     [
         transforms.LoadImaged(keys=["image", "label"]),
         # transforms.ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
-        masked(keys=["image", "label"]),
+        # masked(keys=["image", "label"]),
         ConvertToMultiChannel_with_infiltration(keys="label"),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
     ]
@@ -586,7 +586,7 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_30_casos/"
+    dataset_path = "./Dataset/Dataset_106_10_casos/"
 
     train_set = CustomDataset(
         dataset_path, section="train", transform=train_transform
@@ -659,10 +659,10 @@ def main(config_train):
     plt.title("Val Mean Dice WT")
     plt.xlabel("epoch")
     plt.plot(trains_epoch, dices_wt, color="brown")
-    plt.subplot(1, 3, 3)
-    plt.title("Val Mean Dice ET")
-    plt.xlabel("epoch")
-    plt.plot(trains_epoch, dices_et, color="purple")
+    # plt.subplot(1, 3, 3)
+    # plt.title("Val Mean Dice ET")
+    # plt.xlabel("epoch")
+    # plt.plot(trains_epoch, dices_et, color="purple")
     plt.show()
 
     # finish W&B run
