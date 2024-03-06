@@ -199,6 +199,13 @@ class CustomDataset(Dataset):
                     "labels",
                     f"{case_folder}_segm.nii.gz",
                 )
+                if not os.path.exists(label_file):
+                    label_file = os.path.join(
+                        section_path,
+                        "labels",
+                        f"{case_folder}_automated_approx_segm.nii.gz",
+                    )
+
                 # _automated_approx_segm / _segm
 
                 # Verificar si el caso ya ha sido procesado

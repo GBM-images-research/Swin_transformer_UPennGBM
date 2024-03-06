@@ -3,27 +3,6 @@ import os
 import time
 from monai.data import DataLoader, decollate_batch
 
-# from monai.losses import DiceLoss
-# from monai.inferers import sliding_window_inference
-# from monai.metrics import DiceMetric
-from monai.networks.nets import SegResNet
-
-from monai.transforms import (
-    #     Activations,
-    #     AsDiscrete,
-    #     Compose,
-    #     LoadImaged,
-    MapTransform,
-    #     NormalizeIntensityd,
-    #     Orientationd,
-    #     RandSpatialCropd,
-    #     CropForegroundd,
-    #     Spacingd,
-    #     EnsureTyped,
-    #     EnsureChannelFirstd,
-    #     CropForegroundd,
-)
-
 import torch
 import torch.nn.parallel
 
@@ -48,18 +27,16 @@ from monai import transforms
 from monai.transforms import (
     AsDiscrete,
     Activations,
+    MapTransform,
 )
 
-from monai.config import print_config
 from monai.metrics import DiceMetric
 from monai.utils.enums import MetricReduction
 from monai.networks.nets import SwinUNETR
-from monai import data
 
 # from monai.data import decollate_batch
 from functools import partial
 
-import torch
 
 ####
 
@@ -101,12 +78,11 @@ def expand_mask_3d_td(
 
 class ConvertToMultiChannel_with_infiltration(MapTransform):
     """
-    Convert labels to multi channels based on brats classes:
+    Convert labels to Nroi + Froi + Edema:
     label 1 is necrosis
     label 2 is edema
     label 3 is activo
-    The possible classes are N (necrosis), E (edema)
-    and TA (active).
+    The possible classes are Nroi (ROI cercana), Froi(ROI lejana), Edema
 
     """
 
@@ -168,54 +144,6 @@ class masked(MapTransform):
         data_dict["image"] = data_dict["image"] * B
         return data_dict
 
-
-# # Transformaciones
-# t_transform = Compose(
-#     [
-#         LoadImaged(keys=["image", "label"], allow_missing_keys=True),
-#         EnsureChannelFirstd(keys="image"),
-#         EnsureTyped(keys=["image", "label"]),
-#         ConvertToMultiChannel_with_infiltration(keys="label"),
-#         Orientationd(keys=["image", "label"], axcodes="RAS"),
-#         Spacingd(
-#             keys=["image", "label"],
-#             pixdim=(1.0, 1.0, 1.0),
-#             mode=("bilinear", "nearest"),
-#         ),
-#         NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
-#         CropForegroundd(
-#             keys=["image", "label"], source_key="label", margin=[112, 112, 72]
-#         ),
-#         RandSpatialCropd(
-#             keys=["image", "label"], roi_size=[112, 112, 72], random_size=False
-#         ),  # [224, 224, 144]
-#     ]
-# )
-
-
-# v_transform = Compose(
-#     [
-#         LoadImaged(keys=["image", "label"], allow_missing_keys=True),
-#         EnsureChannelFirstd(keys="image"),
-#         EnsureTyped(keys=["image", "label"]),
-#         ConvertToMultiChannel_with_infiltration(keys="label"),
-#         Orientationd(keys=["image", "label"], axcodes="RAS"),
-#         Spacingd(
-#             keys=["image", "label"],
-#             pixdim=(1.0, 1.0, 1.0),
-#             mode=("bilinear", "nearest"),
-#         ),
-#         NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
-#     ]
-# )
-
-
-# # Creando el modelo
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# # DATA_DIR = Path('./data/')
-# SAVE_DIR = "./Dataset"
-# # SAVE_DIR.mkdir(exist_ok=True, parents=True)
-# DEVICE = device
 
 #################################
 # HIPER PARAMETER CONFIGURATION #
@@ -607,11 +535,7 @@ def main(config_train):
     im_v = val_set[0]
     # (im_t["image"].shape)
     print(im_v["label"].shape)
-    # return
-    # im_v = val_set[0]
-    # print(im_v["image"].shape)
-    # print(im_v["label"].shape)
-    # return
+
     ##########################################################
     # Comenzar entrenamiento
     ##########################################################
