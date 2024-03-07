@@ -8,7 +8,7 @@ Copy in tne root directory a Dataset folder with the following structure:
 Dataset_106_10_casos
     
     ├───recurrence
-    │   └───images_s
+    │   └───images
     │       ├───UPENN-GBM-00036_21
     │       ├───UPENN-GBM-00042_11
     │       ├───UPENN-GBM-00045_21
