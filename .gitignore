@@ -164,5 +164,9 @@ Data/
 wandb/
 artifacts/
 Dataset/
+Datatest/
 Weights/
+trained_models/
 pruebas.ipynb
+
+
