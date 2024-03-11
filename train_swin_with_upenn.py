@@ -538,7 +538,7 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_225_30_casos/"
+    dataset_path = "./Dataset/Dataset_225_20_casos/"
 
     train_set = CustomDataset(
         dataset_path, section="train", transform=train_transform
