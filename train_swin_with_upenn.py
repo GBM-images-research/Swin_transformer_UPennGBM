@@ -313,7 +313,7 @@ model_path = os.path.join("./trained_models", "model.pt")
 loaded_model = torch.load(model_path)
 
 # Load the state dictionary into the model
-model.load_state_dict(loaded_model)
+model.load_state_dict(loaded_model, strict=False)
 
 ###########################
 # Optimiser function loss #
