@@ -293,7 +293,31 @@ model = SwinUNETR(
     use_checkpoint=True,
 ).to(device)
 
-# Optimiser function loss
+##############################
+### Traer modelo desde WandB #
+##############################
+
+# mlops-team89/Swin_UPENN/93rp3g83_best_model:v0  -> cerebro_nroi+froi
+# mlops-team89/Swin_UPENN/sq1r37ci_best_model:v0  -> cerebro_nroi+froi+edema
+
+# run = wandb.init()
+artifact = run.use_artifact(
+    "mlops-team89/Swin_UPENN_106cases/4qi96sog_best_model:v0", type="model"
+)
+artifact_dir = artifact.download()
+print(artifact_dir)
+model_path = os.path.join(artifact_dir, "model.pt")
+# model_path = os.path.join('./trained_models', "model.pt")
+
+# Load the model on CPU
+loaded_model = torch.load(model_path, map_location=torch.device("cpu"))["state_dict"]
+
+# Load the state dictionary into the model
+model.load_state_dict(loaded_model)
+
+###########################
+# Optimiser function loss #
+###########################
 torch.backends.cudnn.benchmark = True
 dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
 post_sigmoid = Activations(sigmoid=True)
@@ -514,7 +538,7 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_106_10_casos/"
+    dataset_path = "./Dataset/Dataset_225_30_casos/"
 
     train_set = CustomDataset(
         dataset_path, section="train", transform=train_transform
