@@ -310,7 +310,7 @@ model_path = os.path.join(artifact_dir, "model.pt")
 # model_path = os.path.join('./trained_models', "model.pt")
 
 # Load the model on CPU
-loaded_model = torch.load(model_path, map_location=torch.device("cpu"))["state_dict"]
+loaded_model = torch.load(model_path)
 
 # Load the state dictionary into the model
 model.load_state_dict(loaded_model)
@@ -538,7 +538,7 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_225_20_casos/"
+    dataset_path = "./Dataset/Dataset_225_30_casos/"
 
     train_set = CustomDataset(
         dataset_path, section="train", transform=train_transform
