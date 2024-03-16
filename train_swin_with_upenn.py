@@ -301,13 +301,13 @@ model = SwinUNETR(
 # mlops-team89/Swin_UPENN/sq1r37ci_best_model:v0  -> cerebro_nroi+froi+edema
 
 # run = wandb.init()
-# artifact = run.use_artifact(
-#     "mlops-team89/Swin_UPENN_106cases/4qi96sog_best_model:v0", type="model"
-# )
-# artifact_dir = artifact.download()
-# print(artifact_dir)
-# model_path = os.path.join(artifact_dir, "model.pt")
-model_path = os.path.join("./trained_models", "model.pt")
+artifact = run.use_artifact(
+    "mlops-team89/Swin_UPENN_106cases/8fhm3ha5_best_model:v0", type="model"
+)
+artifact_dir = artifact.download()
+print(artifact_dir)
+model_path = os.path.join(artifact_dir, "model.pt")
+# model_path = os.path.join("./trained_models", "model.pt")
 
 # Load the model on CPU
 loaded_model = torch.load(model_path)
