@@ -314,11 +314,12 @@ print(artifact_dir)
 model_path = os.path.join(artifact_dir, "model.pt")
 # model_path = os.path.join("./trained_models", "model.pt")
 
-# Load the model on CPU
+# Load the model
 loaded_model = torch.load(model_path)
 
 # Load the state dictionary into the model
-model.load_state_dict(loaded_model, strict=False)
+# model.load_state_dict(loaded_model, strict=False)
+model.load_state_dict(loaded_model["state_dict"])
 
 ###########################
 # Optimiser function loss #
