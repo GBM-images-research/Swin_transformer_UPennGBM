@@ -5,7 +5,7 @@ import shutil
 def copiar_archivos(casos, ruta_original, ruta_destino, set_type="train"):
     for caso in casos:
         # Crear estructura de carpetas en el nuevo dataset
-        os.makedirs(os.path.join(ruta_destino, "train", "labels"), exist_ok=True)
+        os.makedirs(os.path.join(ruta_destino, set_type, "labels"), exist_ok=True)
         os.makedirs(
             os.path.join(
                 ruta_destino,
@@ -342,8 +342,47 @@ casos = [
     597,
     605,
 ]
+casos = [
+    36,
+    42,
+    45,
+    51,
+    52,
+    55,
+    84,
+    86,
+    88,
+    122,
+    128,
+    129,
+    133,
+    134,
+    140,
+    141,
+    145,
+    148,
+    150,
+    160,
+    183,
+    197,
+    219,
+    267,
+    285,
+    295,
+    301,
+    302,
+    307,
+    312,
+    314,
+    332,
+    352,
+    353,
+    354,
+    355,
+]
+casos = [52]
 ruta_dataset_original = "E:\\Download\\UPENN-GBM\\NIfTI-files"
 ruta_dataset_destino = "E:\\Download\\UPENN-GBM\\Dataset_new"
 
 # Llamar a la función de copia
-copiar_archivos(casos, ruta_dataset_original, ruta_dataset_destino, set_type="valid")
+copiar_archivos(casos, ruta_dataset_original, ruta_dataset_destino, set_type="test")
