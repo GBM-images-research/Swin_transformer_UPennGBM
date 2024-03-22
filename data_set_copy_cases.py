@@ -73,6 +73,7 @@ def copiar_archivos(casos, ruta_original, ruta_destino, set_type="train"):
 
 
 # Definir casos y rutas
+# Automáticos
 casos = [
     12,
     22,
@@ -320,6 +321,7 @@ casos = [
     608,
     611,
 ]  # Puedes modificar esta lista con los casos deseados
+# Corregidos
 casos = [
     22,
     81,
@@ -342,6 +344,7 @@ casos = [
     597,
     605,
 ]
+# Validacion
 casos = [
     36,
     42,
@@ -380,7 +383,7 @@ casos = [
     354,
     355,
 ]
-casos = [52]
+
 ruta_dataset_original = "E:\\Download\\UPENN-GBM\\NIfTI-files"
 ruta_dataset_destino = "E:\\Download\\UPENN-GBM\\Dataset_new"
 
