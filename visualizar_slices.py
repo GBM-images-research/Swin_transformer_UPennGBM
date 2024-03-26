@@ -64,7 +64,8 @@ def imprimir_inferencia(serie, seg_out, seg, slice, recurrence=False):
         ax[0, 1].set_title("label")
 
         ax[0, 2].clear()
-        ax[0, 2].imshow(seg_out[:, :, slice_num])
+        ax[0, 2].imshow(img[:, :, slice_num], cmap="gray")
+        ax[0, 2].imshow(seg_out[:, :, slice_num], cmap="jet", alpha=0.5)
         ax[0, 2].set_title("nroi - froi - inter.")
 
         ax[1, 0].clear()
@@ -72,8 +73,9 @@ def imprimir_inferencia(serie, seg_out, seg, slice, recurrence=False):
         ax[1, 0].set_title("Map nroi")
 
         ax[1, 1].clear()
-        ax[1, 1].imshow(seg[1][:, :, slice_num])
-        ax[1, 1].set_title("Map froi")
+        ax[1, 1].imshow(img_rec[:, :, slice_num], cmap="gray")
+        ax[1, 1].imshow(seg[0][:, :, slice_num], cmap="jet", alpha=0.5)
+        ax[1, 1].set_title("Recurrence Map nroi")
 
         if recurrence:
             ax[1, 2].clear()
