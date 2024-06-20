@@ -285,7 +285,7 @@ val_transform = transforms.Compose(
 
 # Create Swin transformer
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 model = SwinUNETR(
     img_size=roi,
