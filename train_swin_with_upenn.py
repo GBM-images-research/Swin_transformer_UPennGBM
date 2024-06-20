@@ -155,10 +155,10 @@ batch_size = 1
 sw_batch_size = 2
 fold = 1
 infer_overlap = 0.5
-max_epochs = 30
+max_epochs = 100
 val_every = 1
-lr = 1e-5  # default 1e-4
-weight_decay = 1e-6  # default 1e-5
+lr = 1e-4  # default 1e-4
+weight_decay = 1e-5  # default 1e-5
 
 # train_loader, val_loader = get_loader(batch_size, data_dir, json_list, fold, roi)
 
