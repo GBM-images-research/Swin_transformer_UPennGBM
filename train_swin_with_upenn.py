@@ -117,8 +117,8 @@ class ConvertToMultiChannel_with_infiltration(MapTransform):
             N_roi = expand_mask_3d_td(
                 filled_tumor_core,
                 edema=edema,
-                distance_cm_max=0.5,
-                distance_cm_min=0.1,
+                distance_cm_max=1.0,  # 0.5
+                distance_cm_min=0.1,  # 0.1
                 voxel_size=voxel_size_cm,
             )
             result.append(N_roi)
@@ -126,8 +126,8 @@ class ConvertToMultiChannel_with_infiltration(MapTransform):
             F_roi = expand_mask_3d_td(
                 filled_tumor_core,
                 edema=edema,
-                distance_cm_max=10,
-                distance_cm_min=1,
+                distance_cm_max=10,  # 10
+                distance_cm_min=1.1,  # 1
                 voxel_size=voxel_size_cm,
             )
             result.append(F_roi)
@@ -172,7 +172,7 @@ config_train = SimpleNamespace(
     val_every=val_every,
     lr=lr,
     weight_decay=weight_decay,
-    GT="nroi + froi",  # modifica para eliminar edema
+    GT="nroi + froi sin T1GD",  # modifica para eliminar edema
 )
 
 #############################
@@ -269,8 +269,8 @@ train_transform = transforms.Compose(
         transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
         transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=2),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
-        transforms.RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
-        transforms.RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
+        # transforms.RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
+        # transforms.RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
     ]
 )
 val_transform = transforms.Compose(
@@ -289,8 +289,8 @@ device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 model = SwinUNETR(
     img_size=roi,
-    in_channels=11,
-    out_channels=2,  # mdificar con edema
+    in_channels=10,  # 11
+    out_channels=2,  # modificar con edema
     feature_size=48,
     drop_rate=0.0,
     attn_drop_rate=0.0,
@@ -306,20 +306,20 @@ model = SwinUNETR(
 # mlops-team89/Swin_UPENN/sq1r37ci_best_model:v0  -> cerebro_nroi+froi+edema
 
 # run = wandb.init()
-artifact = run.use_artifact(
-    "mlops-team89/Swin_UPENN_106cases/8fhm3ha5_best_model:v0", type="model"
-)
-artifact_dir = artifact.download()
-print(artifact_dir)
-model_path = os.path.join(artifact_dir, "model.pt")
+# artifact = run.use_artifact(
+#     "mlops-team89/Swin_UPENN_106cases/8fhm3ha5_best_model:v0", type="model"
+# )
+# artifact_dir = artifact.download()
+# print(artifact_dir)
+# model_path = os.path.join(artifact_dir, "model.pt")
 # model_path = os.path.join("./trained_models", "model.pt")
 
 # Load the model
-loaded_model = torch.load(model_path)
+# loaded_model = torch.load(model_path)
 
 # Load the state dictionary into the model
 # model.load_state_dict(loaded_model, strict=False)
-model.load_state_dict(loaded_model["state_dict"])
+# model.load_state_dict(loaded_model["state_dict"])
 
 ###########################
 # Optimiser function loss #

@@ -46,7 +46,14 @@ def imprimir_inferencia(serie, seg_out, seg, slice, recurrence=False):
 
     label = nib.load(label_add).get_fdata()
 
-    fig, ax = plt.subplots(2, 3, figsize=(18, 18))
+    fig, ax = plt.subplots(2, 2, figsize=(12, 9))
+    # Ajustar los espacios entre los subplots
+    plt.subplots_adjust(
+        left=0.05, right=0.95, top=0.95, bottom=0.05, wspace=0.05, hspace=0.05
+    )
+
+    # Hacer que los ejes ocupen todo el espacio disponible en la figura
+    fig.tight_layout()
     fig.canvas.mpl_connect(
         "scroll_event", lambda event: scroll_slices(event, img.shape[2])
     )
@@ -56,31 +63,32 @@ def imprimir_inferencia(serie, seg_out, seg, slice, recurrence=False):
 
     def update_slice(slice_num):
         ax[0, 0].clear()
-        ax[0, 0].imshow(img[:, :, slice_num], cmap="gray")
+        ax[0, 0].imshow(np.rot90(img[:, :, slice_num], k=-1), cmap="gray")
         ax[0, 0].set_title("image")
 
+        # GT segmentation
+        # ax[0, 0].clear()
+        # ax[0, 0].imshow(np.rot90(label[:, :, slice_num], k=-1))
+        # ax[0, 0].set_title("label")
+
         ax[0, 1].clear()
-        ax[0, 1].imshow(label[:, :, slice_num])
-        ax[0, 1].set_title("label")
+        ax[0, 1].imshow(np.rot90(img[:, :, slice_num], k=-1), cmap="gray")
+        ax[0, 1].imshow(np.rot90(seg_out[:, :, slice_num], k=-1), cmap="jet", alpha=0.3)
+        ax[0, 1].set_title("nroi - froi - inter.")
 
-        ax[0, 2].clear()
-        ax[0, 2].imshow(img[:, :, slice_num], cmap="gray")
-        ax[0, 2].imshow(seg_out[:, :, slice_num], cmap="jet", alpha=0.5)
-        ax[0, 2].set_title("nroi - froi - inter.")
-
-        ax[1, 0].clear()
-        ax[1, 0].imshow(seg[0][:, :, slice_num])
-        ax[1, 0].set_title("Map nroi")
+        # ax[1, 0].clear()
+        # ax[1, 0].imshow(np.rot90(seg[0][:, :, slice_num], k=-1))
+        # ax[1, 0].set_title("Map nroi")
 
         ax[1, 1].clear()
-        ax[1, 1].imshow(img_rec[:, :, slice_num], cmap="gray")
-        ax[1, 1].imshow(seg[0][:, :, slice_num], cmap="jet", alpha=0.5)
+        ax[1, 1].imshow(np.rot90(img_rec[:, :, slice_num], k=-1), cmap="gray")
+        ax[1, 1].imshow(np.rot90(seg_out[:, :, slice_num], k=-1), cmap="jet", alpha=0.3)
         ax[1, 1].set_title("Recurrence Map nroi")
 
         if recurrence:
-            ax[1, 2].clear()
-            ax[1, 2].imshow(img_rec[:, :, slice_num], cmap="gray")
-            ax[1, 2].set_title("image_recurrence")
+            ax[1, 0].clear()
+            ax[1, 0].imshow(np.rot90(img_rec[:, :, slice_num], k=-1), cmap="gray")
+            ax[1, 0].set_title("image_recurrence")
 
         plt.draw()
 
@@ -112,8 +120,10 @@ def main():
     parser.add_argument("--serie", type=int, default=36, help="Número de serie")
     args = parser.parse_args()
 
-    seg_out = np.load(f"trained_models/seg_out_{str(args.serie).zfill(5)}.npy")
-    seg = np.load(f"trained_models/seg_{str(args.serie).zfill(5)}.npy")
+    seg_out = np.load(
+        f"trained_models/inferences/seg_out_{str(args.serie).zfill(5)}.npy"
+    )
+    seg = np.load(f"trained_models/inferences/seg_{str(args.serie).zfill(5)}.npy")
     slice = 70  # Slice inicial
 
     imprimir_inferencia(

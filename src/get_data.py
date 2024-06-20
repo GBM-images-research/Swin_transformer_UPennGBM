@@ -187,6 +187,101 @@ class CustomDataset(Dataset):
                     n: [
                         os.path.join(case_path, file)
                         for file in os.listdir(case_path)
+                        if file.endswith(".nii.gz") and not file.endswith("T1GD.nii.gz")
+                    ]
+                }
+
+                modality_files.append(case_files)
+
+                # Obtener el archivo de etiqueta correspondiente
+                label_file = os.path.join(
+                    section_path,
+                    "labels",
+                    f"{case_folder}_segm.nii.gz",
+                )
+                if not os.path.exists(label_file):
+                    label_file = os.path.join(
+                        section_path,
+                        "labels",
+                        f"{case_folder}_automated_approx_segm.nii.gz",
+                    )
+
+                # _automated_approx_segm / _segm
+
+                # Verificar si el caso ya ha sido procesado
+                if label_file not in label_files:
+                    label_files.append(label_file)
+
+            image_files.append(modality_files)
+
+        # Lista de listas resultante
+
+        converted_list = [[] for _ in range(len(image_files[0]))]
+
+        for l in image_files:
+            for key, values in enumerate(l):
+                converted_list[key] += values[key]
+
+        print(f"Found {len(converted_list)} images and {len(label_files)} labels.")
+        # print(f"Image files: {converted_list}")
+        # print(f"Label files: {label_files}")
+        return converted_list, label_files
+
+
+### Datset para Segmentaci'on de N, Edema y Activo ###
+class CustomDatasetSeg(Dataset):
+    def __init__(self, root_dir, section="train", transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
+        self.section = section
+        self.image_files, self.label_files = self._load_files()
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def _transform(self, index: int):
+        """
+        Fetch single data item from `self.data`.
+        """
+        image = self.image_files[index]
+        label = self.label_files[index]
+
+        if self.transform is not None:
+            data = apply_transform(
+                self.transform,
+                data={"image": image, "label": label},
+            )
+            # label = apply_transform(self.transform, label)
+
+        return data["image"], data["label"]
+
+    def __getitem__(self, index):
+        # image_path = self.image_files[index]
+        # label_path = self.label_files[index]
+        # image, label = self._load_data(image_path, label_path)
+        if self.transform:
+            image, label = self._transform(index=index)
+            # print(image.shape, label.shape)
+        return {"image": image, "label": label}
+
+    def _load_files(self):
+        image_files, label_files = [], []
+        section_path = os.path.join(self.root_dir, self.section)
+
+        modalities = ["images_structural"]
+
+        for modality in modalities:
+            modality_files = []
+            modality_path = os.path.join(section_path, "images", modality)
+
+            for n, case_folder in enumerate(os.listdir(modality_path)):
+                case_path = os.path.join(modality_path, case_folder)
+
+                # Obtener los archivos de imágenes para cada caso y modalidad
+                case_files = {
+                    n: [
+                        os.path.join(case_path, file)
+                        for file in os.listdir(case_path)
                         if file.endswith(".nii.gz")
                     ]
                 }
