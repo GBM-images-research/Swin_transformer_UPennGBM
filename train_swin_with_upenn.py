@@ -117,7 +117,7 @@ class ConvertToMultiChannel_with_infiltration(MapTransform):
             N_roi = expand_mask_3d_td(
                 filled_tumor_core,
                 edema=edema,
-                distance_cm_max=1.0,  # 0.5
+                distance_cm_max=0.5,  # 0.5
                 distance_cm_min=0.1,  # 0.1
                 voxel_size=voxel_size_cm,
             )
@@ -127,7 +127,7 @@ class ConvertToMultiChannel_with_infiltration(MapTransform):
                 filled_tumor_core,
                 edema=edema,
                 distance_cm_max=10,  # 10
-                distance_cm_min=1.1,  # 1
+                distance_cm_min=1,  # 1
                 voxel_size=voxel_size_cm,
             )
             result.append(F_roi)
@@ -172,7 +172,7 @@ config_train = SimpleNamespace(
     val_every=val_every,
     lr=lr,
     weight_decay=weight_decay,
-    GT="nroi + froi sin T1GD",  # modifica para eliminar edema
+    GT="nroi 0.5 + froi sin T1GD",  # modifica para eliminar edema
 )
 
 #############################
