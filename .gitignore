@@ -168,5 +168,6 @@ Datatest/
 Weights/
 trained_models/
 pruebas.ipynb
+simple_inference.ipynb
 
 
