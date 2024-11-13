@@ -203,7 +203,7 @@ class CustomDataset(Dataset):
                     label_file = os.path.join(
                         section_path,
                         "labels",
-                        f"{case_folder}_automated_approx_segm.nii.gz",
+                        f"{case_folder}_combined_approx_segm.nii.gz",  # automated_approx_segm.nii.gz
                     )
 
                 # _automated_approx_segm / _segm
@@ -321,3 +321,49 @@ class CustomDatasetSeg(Dataset):
         # print(f"Image files: {converted_list}")
         # print(f"Label files: {label_files}")
         return converted_list, label_files
+
+
+#####################
+### Combinar lebels y guardar###
+####################################
+import nibabel as nib
+import numpy as np
+
+
+# Función para guardar el volumen combinado
+def save_img(I_img, savename, header=None, affine=None):
+    if header is None or affine is None:
+        affine = np.diag([1, 1, 1, 1])
+        new_img = nib.Nifti1Image(I_img, affine)
+    else:
+        new_img = nib.Nifti1Image(I_img, affine, header=header)
+
+    nib.save(new_img, savename)
+
+
+# Función para combinar los volúmenes
+def combine_labels(path_label1, path_label2, output_path):
+    # Leer los volúmenes de segmentación
+    label1_img = nib.load(path_label1)
+    label2_img = nib.load(path_label2)
+
+    # Obtener los datos de los volúmenes
+    label1_data = label1_img.get_fdata()
+    label2_data = label2_img.get_fdata()
+
+    # Imprimir los valores que toma el volumen
+    print(np.unique(label1_data))
+    valores = np.unique(label2_data)
+    print(valores)
+
+    # Crear un nuevo volumen inicializado en cero
+    combined_data = np.zeros_like(label1_data)
+
+    # Conservar solo los voxeles con valor 4 en label1 o valor 6 en label2
+    combined_data[(label1_data == 2.0)] = 2.0
+    combined_data[(label2_data == valores[1])] = 6.0
+
+    # Guardar el nuevo volumen combinado
+    save_img(
+        combined_data, output_path, header=label1_img.header, affine=label1_img.affine
+    )
