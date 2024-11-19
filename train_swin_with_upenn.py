@@ -76,6 +76,26 @@ def expand_mask_3d_td(
     return torch.from_numpy(exterior_mask)
 
 
+class ConvertToMultiChannelBasedOnAnotatedInfiltration(MapTransform):
+    """
+    Convert labels to multi channels based on brats classes:
+    label 2 is edema pure
+    label 6 is infiltrated edema
+    The possible classes are IE (infiltrated edema), PE (pure edema)
+    """
+
+    def __call__(self, data):
+        d = dict(data)
+        for key in self.keys:
+            result = []
+            # label 1 necro
+            result.append(d[key] == 2)
+            # label 2 is ET
+            result.append(d[key] == 6)
+            d[key] = torch.stack(result, axis=0).float()
+        return d
+
+
 class ConvertToMultiChannel_with_infiltration(MapTransform):
     """
     Convert labels to Nroi + Froi + Edema:
@@ -172,7 +192,7 @@ config_train = SimpleNamespace(
     val_every=val_every,
     lr=lr,
     weight_decay=weight_decay,
-    GT="nroi 0.5 + froi sin T1GD",  # modifica para eliminar edema
+    GT="Edema + Infiltration",  # modifica para eliminar edema
 )
 
 #############################
@@ -185,7 +205,7 @@ api_key = os.environ.get("WANDB_API_KEY")
 wandb.login(key=api_key)
 
 # create a wandb run
-run = wandb.init(project="Swin_UPENN_106cases", job_type="train", config=config_train)
+run = wandb.init(project="Swin_UPENN_10cases", job_type="train", config=config_train)
 
 # we pass the config back from W&B
 config_train = wandb.config
@@ -254,10 +274,11 @@ train_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # transforms.ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
         # masked(keys=["image", "label"]),
-        ConvertToMultiChannel_with_infiltration(keys="label"),
+        # ConvertToMultiChannel_with_infiltration(keys="label"),
+        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
-            source_key="image",
+            source_key="label",
             k_divisible=[roi[0], roi[1], roi[2]],
         ),
         transforms.RandSpatialCropd(
@@ -278,7 +299,8 @@ val_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # transforms.ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
         # masked(keys=["image", "label"]),
-        ConvertToMultiChannel_with_infiltration(keys="label"),
+        # ConvertToMultiChannel_with_infiltration(keys="label"),
+        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
     ]
 )
@@ -296,11 +318,20 @@ model = SwinUNETR(
     attn_drop_rate=0.0,
     dropout_path_rate=0.0,
     use_checkpoint=True,
-).to(device)
+)
 
 ##############################
 ### Traer modelo desde WandB #
 ##############################
+# run = wandb.init()
+artifact = run.use_artifact(
+    "mlops-team89/Swin_UPENN_106cases/mjkearkn_best_model:v0", type="model"
+)
+artifact_dir = artifact.download()
+print(artifact_dir)
+model_path = os.path.join(artifact_dir, "model.pt")
+model.load_state_dict(torch.load(os.path.join(model_path, "model.pt"))["state_dict"])
+model.to(device)
 
 # mlops-team89/Swin_UPENN/93rp3g83_best_model:v0  -> cerebro_nroi+froi
 # mlops-team89/Swin_UPENN/sq1r37ci_best_model:v0  -> cerebro_nroi+froi+edema
