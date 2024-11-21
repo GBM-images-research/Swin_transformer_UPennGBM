@@ -88,10 +88,10 @@ class ConvertToMultiChannelBasedOnAnotatedInfiltration(MapTransform):
         d = dict(data)
         for key in self.keys:
             result = []
-            # label 1 necro
-            result.append(d[key] == 2)
-            # label 2 is ET
+            # label 1 N_ROI
             result.append(d[key] == 6)
+            # label 2 F_ROI
+            result.append(d[key] == 2)
             d[key] = torch.stack(result, axis=0).float()
         return d
 
@@ -177,7 +177,7 @@ fold = 1
 infer_overlap = 0.5
 max_epochs = 100
 val_every = 1
-lr = 1e-4  # default 1e-4
+lr = 1e-3  # default 1e-4
 weight_decay = 1e-5  # default 1e-5
 
 # train_loader, val_loader = get_loader(batch_size, data_dir, json_list, fold, roi)
@@ -313,7 +313,7 @@ model = SwinUNETR(
     img_size=roi,
     in_channels=10,  # 11
     out_channels=2,  # modificar con edema
-    feature_size=48,
+    feature_size=96, # default 48
     drop_rate=0.0,
     attn_drop_rate=0.0,
     dropout_path_rate=0.0,
@@ -324,13 +324,14 @@ model = SwinUNETR(
 ### Traer modelo desde WandB #
 ##############################
 # run = wandb.init()
-artifact = run.use_artifact(
-    "mlops-team89/Swin_UPENN_106cases/mjkearkn_best_model:v0", type="model"
-)
-artifact_dir = artifact.download()
-print(artifact_dir)
-model_path = os.path.join(artifact_dir, "model.pt")
-model.load_state_dict(torch.load(os.path.join(model_path, "model.pt"))["state_dict"])
+# artifact = run.use_artifact(
+#     "mlops-team89/Swin_UPENN_106cases/mjkearkn_best_model:v0", type="model"
+# )
+# artifact_dir = artifact.download()
+# print(artifact_dir)
+# model_path = os.path.join(artifact_dir, "model.pt")
+model_path = "./artifacts/mjkearkn_best_model:v0"
+# model.load_state_dict(torch.load(os.path.join(model_path, "model.pt"))["state_dict"])
 model.to(device)
 
 # mlops-team89/Swin_UPENN/93rp3g83_best_model:v0  -> cerebro_nroi+froi
@@ -575,7 +576,7 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_106_30_casos/"
+    dataset_path = "./Dataset/Dataset_10_1_casos/"
 
     train_set = CustomDataset(
         dataset_path, section="train", transform=train_transform
