@@ -177,7 +177,7 @@ fold = 1
 infer_overlap = 0.5
 max_epochs = 100
 val_every = 1
-lr = 1e-3  # default 1e-4
+lr = 1e-4  # default 1e-4
 weight_decay = 1e-5  # default 1e-5
 
 # train_loader, val_loader = get_loader(batch_size, data_dir, json_list, fold, roi)
@@ -313,7 +313,7 @@ model = SwinUNETR(
     img_size=roi,
     in_channels=10,  # 11
     out_channels=2,  # modificar con edema
-    feature_size=96, # default 48
+    feature_size=96,  # default 48
     drop_rate=0.0,
     attn_drop_rate=0.0,
     dropout_path_rate=0.0,
