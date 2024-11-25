@@ -150,6 +150,8 @@ class CustomDataset(Dataset):
         """
         image = self.image_files[index]
         label = self.label_files[index]
+        #print(image)
+        #print(label)
 
         if self.transform is not None:
             data = apply_transform(
@@ -187,7 +189,7 @@ class CustomDataset(Dataset):
                     n: [
                         os.path.join(case_path, file)
                         for file in os.listdir(case_path)
-                        if file.endswith(".nii.gz") and not file.endswith("T1GD.nii.gz")
+                        if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
                     ]
                 }
 
@@ -203,7 +205,7 @@ class CustomDataset(Dataset):
                     label_file = os.path.join(
                         section_path,
                         "labels",
-                        f"{case_folder}_combined_approx_segm.nii.gz",  # automated_approx_segm.nii.gz
+                        f"{case_folder}_automated_approx_segm.nii.gz",  # automated_approx_segm.nii.gz / combined_approx_segm.nii.gz
                     )
 
                 # _automated_approx_segm / _segm
@@ -223,8 +225,8 @@ class CustomDataset(Dataset):
                 converted_list[key] += values[key]
 
         print(f"Found {len(converted_list)} images and {len(label_files)} labels.")
-        # print(f"Image files: {converted_list}")
-        # print(f"Label files: {label_files}")
+        #print(f"Image files: {converted_list[318]}")
+        #print(f"Label files: {label_files[318]}")
         return converted_list, label_files
 
 

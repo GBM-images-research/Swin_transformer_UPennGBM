@@ -170,7 +170,7 @@ class masked(MapTransform):
 #################################
 
 ### Hyperparameter
-roi = (128, 128, 64)  # (128, 128, 128)
+roi = (64, 64, 64)  # (128, 128, 128)
 batch_size = 1
 sw_batch_size = 2
 fold = 1
@@ -192,7 +192,7 @@ config_train = SimpleNamespace(
     val_every=val_every,
     lr=lr,
     weight_decay=weight_decay,
-    GT="Edema + Infiltration",  # modifica para eliminar edema
+    GT="N-ROI + F-ROI 225",  # modifica para eliminar edema "Edema + Infiltration"
 )
 
 #############################
@@ -205,7 +205,7 @@ api_key = os.environ.get("WANDB_API_KEY")
 wandb.login(key=api_key)
 
 # create a wandb run
-run = wandb.init(project="Swin_UPENN_10cases", job_type="train", config=config_train)
+run = wandb.init(project="Swin_UPENN_106cases", job_type="train", config=config_train)
 
 # we pass the config back from W&B
 config_train = wandb.config
@@ -274,8 +274,8 @@ train_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # transforms.ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
         # masked(keys=["image", "label"]),
-        # ConvertToMultiChannel_with_infiltration(keys="label"),
-        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        ConvertToMultiChannel_with_infiltration(keys="label"),
+        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
             source_key="label",
@@ -299,8 +299,8 @@ val_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # transforms.ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
         # masked(keys=["image", "label"]),
-        # ConvertToMultiChannel_with_infiltration(keys="label"),
-        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        ConvertToMultiChannel_with_infiltration(keys="label"),
+        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
     ]
 )
@@ -311,7 +311,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 model = SwinUNETR(
     img_size=roi,
-    in_channels=10,  # 11
+    in_channels=11,  # 10 / 11
     out_channels=2,  # modificar con edema
     feature_size=96,  # default 48
     drop_rate=0.0,
@@ -330,7 +330,7 @@ model = SwinUNETR(
 # artifact_dir = artifact.download()
 # print(artifact_dir)
 # model_path = os.path.join(artifact_dir, "model.pt")
-model_path = "./artifacts/mjkearkn_best_model:v0"
+# model_path = "./artifacts/mjkearkn_best_model:v0"
 # model.load_state_dict(torch.load(os.path.join(model_path, "model.pt"))["state_dict"])
 model.to(device)
 
@@ -576,7 +576,7 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_10_1_casos/"
+    dataset_path = "./Dataset/Dataset_331_30_casos/"
 
     train_set = CustomDataset(
         dataset_path, section="train", transform=train_transform
