@@ -170,7 +170,7 @@ class masked(MapTransform):
 #################################
 
 ### Hyperparameter
-roi = (64, 64, 64)  # (128, 128, 128)
+roi = (96, 96, 96)  # (128, 128, 128)
 batch_size = 1
 sw_batch_size = 2
 fold = 1
@@ -278,7 +278,7 @@ train_transform = transforms.Compose(
         # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
-            source_key="label",
+            source_key="image",
             k_divisible=[roi[0], roi[1], roi[2]],
         ),
         transforms.RandSpatialCropd(
@@ -313,7 +313,7 @@ model = SwinUNETR(
     img_size=roi,
     in_channels=11,  # 10 / 11
     out_channels=2,  # modificar con edema
-    feature_size=96,  # default 48
+    feature_size=48,  # default 48
     drop_rate=0.0,
     attn_drop_rate=0.0,
     dropout_path_rate=0.0,
@@ -587,7 +587,7 @@ def main(config_train):
         dataset_path, section="train", transform=train_transform
     )  # t_transform
     train_loader = DataLoader(
-        train_set, batch_size=batch_size, shuffle=False, num_workers=0
+        train_set, batch_size=batch_size, shuffle=True, num_workers=4
     )
 
     im_t = train_set[0]
@@ -597,7 +597,7 @@ def main(config_train):
     val_set = CustomDataset(
         dataset_path, section="valid", transform=val_transform
     )  # v_transform
-    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=0)
+    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4)
 
     im_v = val_set[0]
     # (im_t["image"].shape)

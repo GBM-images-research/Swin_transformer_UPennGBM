@@ -205,7 +205,7 @@ class CustomDataset(Dataset):
                     label_file = os.path.join(
                         section_path,
                         "labels",
-                        f"{case_folder}_combined_approx_segm.nii.gz",  # automated_approx_segm.nii.gz / combined_approx_segm.nii.gz
+                        f"{case_folder}_automated_approx_segm.nii.gz",  # automated_approx_segm.nii.gz / combined_approx_segm.nii.gz
                     )
 
                 # _automated_approx_segm / _segm
@@ -369,3 +369,79 @@ def combine_labels(path_label1, path_label2, output_path):
     save_img(
         combined_data, output_path, header=label1_img.header, affine=label1_img.affine
     )
+
+# ####################
+# # Create loader
+# ###########################
+# from monai import data
+
+# def load_files(root_dir, fold):
+#         image_files, label_files = [], []
+#         section_path = os.path.join(root_dir, fold)
+
+#         modalities = ["images_structural"]
+
+#         for modality in modalities:
+#             modality_files = []
+#             modality_path = os.path.join(section_path, "images", modality)
+
+#             for n, case_folder in enumerate(os.listdir(modality_path)):
+#                 case_path = os.path.join(modality_path, case_folder)
+
+#                 # Obtener los archivos de imágenes para cada caso y modalidad
+#                 case_files = {
+#                     n: [
+#                         os.path.join(case_path, file)
+#                         for file in os.listdir(case_path)
+#                         if file.endswith(".nii.gz")
+#                     ]
+#                 }
+
+#                 modality_files.append(case_files)
+
+#                 # Obtener el archivo de etiqueta correspondiente
+#                 label_file = os.path.join(
+#                     section_path,
+#                     "labels",
+#                     f"{case_folder}_segm.nii.gz",
+#                 )
+#                 if not os.path.exists(label_file):
+#                     label_file = os.path.join(
+#                         section_path,
+#                         "labels",
+#                         f"{case_folder}_automated_approx_segm.nii.gz",
+#                     )
+
+#                 # _automated_approx_segm / _segm
+
+#                 # Verificar si el caso ya ha sido procesado
+#                 if label_file not in label_files:
+#                     label_files.append(label_file)
+
+#             image_files.append(modality_files)
+#         # Lista de listas resultante
+
+#         converted_list = [[] for _ in range(len(image_files[0]))]
+
+#         for l in image_files:
+#             for key, values in enumerate(l):
+#                 converted_list[key] += values[key]
+
+#         print(f"Found {len(converted_list)} images and {len(label_files)} labels.")
+#         return converted_list, label_files
+
+# def custom_get_loader(data_dir, set_transform, batch_size=1, fold="train", workers=8):
+#     data_dir = data_dir
+#     set_files = load_files(data_dir, fold=fold)
+   
+#     set_ds = data.Dataset(data=set_files, transform=set_transform)
+
+#     set_loader = data.DataLoader(
+#         set_ds,
+#         batch_size=batch_size,
+#         shuffle=True,
+#         num_workers=workers,
+#         pin_memory=True,
+#     )
+#     return set_ds, set_loader
+
