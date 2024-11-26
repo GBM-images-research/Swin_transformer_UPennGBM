@@ -177,8 +177,8 @@ fold = 1
 infer_overlap = 0.5
 max_epochs = 100
 val_every = 1
-lr = 1e-4  # default 1e-4
-weight_decay = 1e-5  # default 1e-5
+lr = 1e-5  # default 1e-4
+weight_decay = 1e-6  # default 1e-5
 
 # train_loader, val_loader = get_loader(batch_size, data_dir, json_list, fold, roi)
 
@@ -274,8 +274,8 @@ train_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # transforms.ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
         # masked(keys=["image", "label"]),
-        ConvertToMultiChannel_with_infiltration(keys="label"),
-        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        # ConvertToMultiChannel_with_infiltration(keys="label"),
+        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
             source_key="label",
@@ -299,8 +299,8 @@ val_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # transforms.ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
         # masked(keys=["image", "label"]),
-        ConvertToMultiChannel_with_infiltration(keys="label"),
-        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        # ConvertToMultiChannel_with_infiltration(keys="label"),
+        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
     ]
 )
@@ -347,16 +347,21 @@ model = SwinUNETR(
 # model_path = os.path.join("./trained_models", "model.pt")
 
 ############################
-# Load the model localmente
+# Cargar el modelo desde un directorio local
 #############################
-# weight = torch.load("Dataset/model_dataset_330_30_64x64x64_v01.pt")
-# model.load_from(weights=weight)
-# print(f"Using pretrained model: {weight}")
-
-
+weight = torch.load("Dataset/model_dataset_330_30_64x64x64_v01.pt")
+model.load_from(weights=weight)
+print(f"Using pretrained model: {weight}")
 # Load the state dictionary into the model
 # model.load_state_dict(loaded_model, strict=False)
 # model.load_state_dict(loaded_model["state_dict"])
+
+# Congelar capas iniciales del modelo
+# for name, param in model.named_parameters():
+#     if "encoder" in name:  # Congelar capas del encoder
+#         param.requires_grad = False
+#     else:
+#         param.requires_grad = True
 
 ###########################
 # Optimiser function loss #
@@ -376,7 +381,12 @@ model_inferer = partial(
     overlap=infer_overlap,
 )
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+# optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+optimizer = torch.optim.AdamW(
+    filter(lambda p: p.requires_grad, model.parameters()),
+    lr=lr,  # Tasa de aprendizaje más baja para ajuste fino
+    weight_decay=weight_decay,  # Peso de decaimiento más bajo
+)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max_epochs)
 
 
@@ -581,7 +591,7 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_331_30_casos/"
+    dataset_path = "./Dataset/Dataset_10_1_casos/"
 
     train_set = CustomDataset(
         dataset_path, section="train", transform=train_transform
