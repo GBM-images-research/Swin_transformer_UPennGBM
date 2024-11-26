@@ -192,7 +192,7 @@ config_train = SimpleNamespace(
     val_every=val_every,
     lr=lr,
     weight_decay=weight_decay,
-    GT="N-ROI + F-ROI 225",  # modifica para eliminar edema "Edema + Infiltration"
+    GT="Edema + Infiltration 10",  # modifica para eliminar edema "Edema + Infiltration" / "N-ROI + F-ROI 330"
 )
 
 #############################
@@ -205,7 +205,7 @@ api_key = os.environ.get("WANDB_API_KEY")
 wandb.login(key=api_key)
 
 # create a wandb run
-run = wandb.init(project="Swin_UPENN_106cases", job_type="train", config=config_train)
+run = wandb.init(project="Swin_UPENN_10cases", job_type="train", config=config_train)
 
 # we pass the config back from W&B
 config_train = wandb.config
@@ -349,9 +349,11 @@ model = SwinUNETR(
 ############################
 # Cargar el modelo desde un directorio local
 #############################
-weight = torch.load("Dataset/model_dataset_330_30_64x64x64_v01.pt")
-model.load_from(weights=weight)
-print(f"Using pretrained model: {weight}")
+model_path="Dataset/model_dataset_330_30_64x64x64_v01.pt"
+model_chekpoint = torch.load(model_path)
+model.load_state_dict(model_chekpoint["state_dict"])
+print(f"Using pretrained model: {model_path}")
+
 # Load the state dictionary into the model
 # model.load_state_dict(loaded_model, strict=False)
 # model.load_state_dict(loaded_model["state_dict"])
