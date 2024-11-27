@@ -170,13 +170,13 @@ class masked(MapTransform):
 #################################
 
 ### Hyperparameter
-roi = (64, 64, 64)  # (128, 128, 128)
+roi = (128, 128, 64)  # (128, 128, 128)
 batch_size = 1
 sw_batch_size = 2
 fold = 1
 infer_overlap = 0.5
 max_epochs = 100
-val_every = 1
+val_every = 2
 lr = 1e-5  # default 1e-4
 weight_decay = 1e-6  # default 1e-5
 
@@ -313,7 +313,7 @@ model = SwinUNETR(
     img_size=roi,
     in_channels=11,  # 10 / 11
     out_channels=2,  # modificar con edema
-    feature_size=96,  # default 48
+    feature_size=48,  # default 48
     drop_rate=0.0,
     attn_drop_rate=0.0,
     dropout_path_rate=0.0,
@@ -349,7 +349,7 @@ model = SwinUNETR(
 ############################
 # Cargar el modelo desde un directorio local
 #############################
-model_path="Dataset/model_dataset_330_30_64x64x64_v01.pt"
+model_path="Dataset/model_dataset_330_30_96x96x96_48f_v02.pt"
 model_chekpoint = torch.load(model_path)
 model.load_state_dict(model_chekpoint["state_dict"])
 print(f"Using pretrained model: {model_path}")
@@ -577,6 +577,7 @@ def trainer(
     at = wandb.Artifact(artifact_name, type="model")
     at.add_file(os.path.join(directory, "model.pt"))
     wandb.log_artifact(at, aliases=["final"])
+    wandb.finish()
 
     return (
         val_acc_max,
