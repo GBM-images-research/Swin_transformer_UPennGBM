@@ -170,7 +170,7 @@ class masked(MapTransform):
 #################################
 
 ### Hyperparameter
-roi = (96, 96, 96)  # (128, 128, 128)
+roi = (128, 128, 64)  # (128, 128, 128)
 batch_size = 1
 sw_batch_size = 2
 fold = 1
@@ -192,7 +192,7 @@ config_train = SimpleNamespace(
     val_every=val_every,
     lr=lr,
     weight_decay=weight_decay,
-    GT="N-ROI + F-ROI 225",  # modifica para eliminar edema "Edema + Infiltration"
+    GT="N-ROI + F-ROI d330-f72",  # modifica para eliminar edema "Edema + Infiltration"
 )
 
 #############################
@@ -313,7 +313,7 @@ model = SwinUNETR(
     img_size=roi,
     in_channels=11,  # 10 / 11
     out_channels=2,  # modificar con edema
-    feature_size=48,  # default 48
+    feature_size=72,  # default 48
     drop_rate=0.0,
     attn_drop_rate=0.0,
     dropout_path_rate=0.0,
@@ -631,30 +631,30 @@ def main(config_train):
     )
     print(f"train completed, best average dice: {val_acc_max:.4f} ")
 
-    plt.figure("train", (12, 6))
-    plt.subplot(1, 2, 1)
-    plt.title("Epoch Average Loss")
-    plt.xlabel("epoch")
-    plt.plot(trains_epoch, loss_epochs, color="red")
-    plt.subplot(1, 2, 2)
-    plt.title("Val Mean Dice")
-    plt.xlabel("epoch")
-    plt.plot(trains_epoch, dices_avg, color="green")
-    plt.show()
-    plt.figure("train", (18, 6))
-    plt.subplot(1, 3, 1)
-    plt.title("Val Mean Dice TC")
-    plt.xlabel("epoch")
-    plt.plot(trains_epoch, dices_tc, color="blue")
-    plt.subplot(1, 3, 2)
-    plt.title("Val Mean Dice WT")
-    plt.xlabel("epoch")
-    plt.plot(trains_epoch, dices_wt, color="brown")
-    # plt.subplot(1, 3, 3)
-    # plt.title("Val Mean Dice ET")
+    # plt.figure("train", (12, 6))
+    # plt.subplot(1, 2, 1)
+    # plt.title("Epoch Average Loss")
     # plt.xlabel("epoch")
-    # plt.plot(trains_epoch, dices_et, color="purple")
-    plt.show()
+    # plt.plot(trains_epoch, loss_epochs, color="red")
+    # plt.subplot(1, 2, 2)
+    # plt.title("Val Mean Dice")
+    # plt.xlabel("epoch")
+    # plt.plot(trains_epoch, dices_avg, color="green")
+    # plt.show()
+    # plt.figure("train", (18, 6))
+    # plt.subplot(1, 3, 1)
+    # plt.title("Val Mean Dice TC")
+    # plt.xlabel("epoch")
+    # plt.plot(trains_epoch, dices_tc, color="blue")
+    # plt.subplot(1, 3, 2)
+    # plt.title("Val Mean Dice WT")
+    # plt.xlabel("epoch")
+    # plt.plot(trains_epoch, dices_wt, color="brown")
+    # # plt.subplot(1, 3, 3)
+    # # plt.title("Val Mean Dice ET")
+    # # plt.xlabel("epoch")
+    # # plt.plot(trains_epoch, dices_et, color="purple")
+    # plt.show()
 
     # finish W&B run
 
