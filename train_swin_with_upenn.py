@@ -587,7 +587,7 @@ def main(config_train):
         dataset_path, section="train", transform=train_transform
     )  # t_transform
     train_loader = DataLoader(
-        train_set, batch_size=batch_size, shuffle=True, num_workers=8
+        train_set, batch_size=batch_size, shuffle=True, num_workers=4
     )
 
     im_t = train_set[0]
@@ -597,7 +597,7 @@ def main(config_train):
     val_set = CustomDataset(
         dataset_path, section="valid", transform=val_transform
     )  # v_transform
-    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=8)
+    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4)
 
     im_v = val_set[0]
     # (im_t["image"].shape)
