@@ -278,7 +278,7 @@ train_transform = transforms.Compose(
         # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
-            source_key="image",
+            source_key="label",
             k_divisible=[roi[0], roi[1], roi[2]],
         ),
         transforms.RandSpatialCropd(
@@ -301,7 +301,11 @@ val_transform = transforms.Compose(
         # masked(keys=["image", "label"]),
         ConvertToMultiChannel_with_infiltration(keys="label"),
         # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
-        transforms.Orientationd(keys=["image", "label"], axcodes="RAS"),
+        transforms.RandSpatialCropd(
+            keys=["image", "label"],
+            roi_size=[240, 240, 155],
+            random_size=False,
+        ),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
     ]
 )
@@ -588,7 +592,7 @@ def main(config_train):
         dataset_path, section="train", transform=train_transform
     )  # t_transform
     train_loader = DataLoader(
-        train_set, batch_size=batch_size, shuffle=False, num_workers=8
+        train_set, batch_size=batch_size, shuffle=False, num_workers=4
     )
 
     im_t = train_set[0]
@@ -598,7 +602,7 @@ def main(config_train):
     val_set = CustomDataset(
         dataset_path, section="valid", transform=val_transform
     )  # v_transform
-    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=8)
+    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4)
 
     im_v = val_set[0]
     # (im_t["image"].shape)
