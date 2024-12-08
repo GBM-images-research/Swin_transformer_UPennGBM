@@ -179,7 +179,7 @@ class CustomDataset(Dataset):
         # Lista con el orden estricto de las modalidades
         modality_order = ["DSC_ap_rCBV", "DSC_PH", "DSC_PSR", 
                   "DTI_AD", "DTI_FA", "DTI_RD", "DTI_TR", 
-                  "FLAIR", "T1", "T1c", "T2"]
+                  "FLAIR", "T1.", "T1c", "T2"]
 
         for modality in modalities:
             modality_files = []
@@ -189,25 +189,25 @@ class CustomDataset(Dataset):
                 case_path = os.path.join(modality_path, case_folder)
 
                 # Obtener los archivos de imágenes para cada caso y modalidad
-                # case_files = {
-                #     n: [
-                #         os.path.join(case_path, file)
-                #         for file in sorted(os.listdir(case_path))
-                #         if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
-                #     ]
-                # }
-                # Obtener los archivos de imágenes para cada caso y modalidad en el orden estricto
                 case_files = {
-                    n: sorted(
-                        [
-                            os.path.join(case_path, file)
-                            for file in os.listdir(case_path)
-                            if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
-                        ],
-                        # Ordenar según la posición del patrón en modality_order
-                        key=lambda x: next((i for i, pattern in enumerate(modality_order) if pattern in x), float('inf'))
-                    )
+                    n: [
+                        os.path.join(case_path, file)
+                        for file in sorted(os.listdir(case_path))
+                        if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
+                    ]
                 }
+                # Obtener los archivos de imágenes para cada caso y modalidad en el orden estricto
+                # case_files = {
+                #     n: sorted(
+                #         [
+                #             os.path.join(case_path, file)
+                #             for file in os.listdir(case_path)
+                #             if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
+                #         ],
+                #         # Ordenar según la posición del patrón en modality_order
+                #         key=lambda x: next((i for i, pattern in enumerate(modality_order) if pattern in x), float('inf'))
+                #     )
+                # }
 
                 modality_files.append(case_files)
 
