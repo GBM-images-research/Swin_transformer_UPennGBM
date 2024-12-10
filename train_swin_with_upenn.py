@@ -278,7 +278,7 @@ train_transform = transforms.Compose(
         # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
-            source_key="label",
+            source_key="image",
             k_divisible=[roi[0], roi[1], roi[2]],
         ),
         transforms.RandSpatialCropd(
@@ -592,7 +592,7 @@ def main(config_train):
         dataset_path, section="train", transform=train_transform
     )  # t_transform
     train_loader = DataLoader(
-        train_set, batch_size=batch_size, shuffle=False, num_workers=4
+        train_set, batch_size=batch_size, shuffle=True, num_workers=4
     )
 
     im_t = train_set[0]
