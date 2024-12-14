@@ -132,7 +132,26 @@ def get_file_data_label2(
 
 
 ###
+def sort_image_list(lista_archivos, patrones):
+    # Crear una función de clave que devuelve el índice del patrón en desired_order
+    def obtener_orden(archivo):
+        for i, patron in enumerate(patrones):
+            if patron in archivo:
+                return i
+        return len(patrones)  # Si no se encuentra, lo coloca al final
 
+    # Identificar patrones que no están en la lista de archivos
+    patrones_no_encontrados = [patron for patron in patrones if not any(patron in archivo for archivo in lista_archivos)]
+
+    # Imprimir alerta si hay patrones no encontrados
+    if patrones_no_encontrados:
+        print("¡Alerta! Los siguientes patrones no se encontraron en la lista de archivos:")
+        for patron in patrones_no_encontrados:
+            print(f" - {patron}")
+
+    # Ordenar la lista usando la función de clave
+    lista_ordenada = sorted(lista_archivos, key=obtener_orden)
+    return lista_ordenada
 
 class CustomDataset(Dataset):
     def __init__(self, root_dir, section="train", transform=None):
@@ -177,9 +196,9 @@ class CustomDataset(Dataset):
 
         modalities = ["images_DSC", "images_DTI", "images_structural"]
         # Lista con el orden estricto de las modalidades
-        modality_order = ["DSC_ap_rCBV", "DSC_PH", "DSC_PSR", 
-                  "DTI_AD", "DTI_FA", "DTI_RD", "DTI_TR", 
-                  "FLAIR", "T1.", "T1c", "T2"]
+        modality_order = {"images_DSC":["DSC_ap-rCBV", "DSC_PH", "DSC_PSR"], 
+                  "images_DTI":["DTI_AD", "DTI_FA", "DTI_RD", "DTI_TR"], 
+                  "images_structural":["FLAIR", "T1.", "T1GD", "T2"]}
 
         for modality in modalities:
             modality_files = []
@@ -187,15 +206,23 @@ class CustomDataset(Dataset):
 
             for n, case_folder in enumerate(os.listdir(modality_path)):
                 case_path = os.path.join(modality_path, case_folder)
+                #print(os.listdir(case_path), type(os.listdir(case_path)))
 
-                # Obtener los archivos de imágenes para cada caso y modalidad
-                case_files = {
-                    n: [
+                # Obtener los archivos de imágenes para cada caso y modalidad /for file in sorted(os.listdir(case_path))
+                lista=[
                         os.path.join(case_path, file)
-                        for file in sorted(os.listdir(case_path))
+                        for file in os.listdir(case_path)
                         if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
                     ]
-                }
+                case_files = {n: sort_image_list(lista, modality_order[modality])}
+                # case_files = {
+                #     n: [
+                #         os.path.join(case_path, file)
+                #         for file in os.listdir(case_path)
+                #         if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
+                #     ]
+                # }
+               
                 # Obtener los archivos de imágenes para cada caso y modalidad en el orden estricto
                 # case_files = {
                 #     n: sorted(
