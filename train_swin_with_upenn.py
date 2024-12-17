@@ -179,6 +179,7 @@ max_epochs = 100
 val_every = 1
 lr = 1e-4  # default 1e-4
 weight_decay = 1e-5  # default 1e-5
+feature_size=48 # default 48
 
 # train_loader, val_loader = get_loader(batch_size, data_dir, json_list, fold, roi)
 
@@ -192,7 +193,8 @@ config_train = SimpleNamespace(
     val_every=val_every,
     lr=lr,
     weight_decay=weight_decay,
-    GT="N-ROI + F-ROI d330-f72",  # modifica para eliminar edema "Edema + Infiltration"
+    feature_size=feature_size,
+    GT="N-ROI + F-ROI d10",  # modifica para eliminar edema "Edema + Infiltration"
 )
 
 #############################
@@ -205,7 +207,7 @@ api_key = os.environ.get("WANDB_API_KEY")
 wandb.login(key=api_key)
 
 # create a wandb run
-run = wandb.init(project="Swin_UPENN_106cases", job_type="train", config=config_train)
+run = wandb.init(project="Swin_UPENN_10casos_pruebas", job_type="train", config=config_train) #Swin_UPENN_106cases
 
 # we pass the config back from W&B
 config_train = wandb.config
@@ -318,7 +320,7 @@ model = SwinUNETR(
     img_size=roi,
     in_channels=11,  # 10 / 11
     out_channels=2,  # modificar con edema
-    feature_size=72,  # default 48
+    feature_size=feature_size,  # default 48
     drop_rate=0.0,
     attn_drop_rate=0.0,
     dropout_path_rate=0.0,
@@ -554,6 +556,14 @@ def trainer(
             dices_wt.append(dice_wt)
             # dices_et.append(dice_et) # comentar sin edema
             dices_avg.append(val_avg_acc)
+            # Guardar last model
+            save_checkpoint(
+                    model,
+                    epoch,
+                    filename="model_last.pt",
+                    best_acc=val_avg_acc,
+                )
+            # Guardar best model
             if val_avg_acc > val_acc_max:
                 print("new best ({:.6f} --> {:.6f}). ".format(val_acc_max, val_avg_acc))
                 val_acc_max = val_avg_acc
@@ -586,7 +596,7 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_331_30_casos/"
+    dataset_path = "./Dataset/Dataset_29_casos/"
 
     train_set = CustomDataset(
         dataset_path, section="train", transform=train_transform
