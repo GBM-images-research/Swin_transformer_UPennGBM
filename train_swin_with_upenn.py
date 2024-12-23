@@ -29,140 +29,20 @@ from monai.transforms import (
     Activations,
     MapTransform,
 )
-
+from monai.utils.enums import TransformBackends
 from monai.metrics import DiceMetric
 from monai.utils.enums import MetricReduction
 from monai.networks.nets import SwinUNETR
 
+
 # from monai.data import decollate_batch
 from functools import partial
 
+from src.custom_transforms import ConvertToMultiChannelBasedOnN_Froi, ConvertToMultiChannelBasedOnBratsClassesdI
 
 ####
 
 logging.basicConfig(level=logging.INFO)
-
-
-# Funciones personalizadas
-
-
-def fill_holes_3d(mask):
-    # Rellenar huecos en la máscara 3D
-    filled_mask = ndimage.binary_fill_holes(mask)
-    return filled_mask
-
-
-def expand_mask_3d_td(
-    mask, edema, distance_cm_max=0.5, distance_cm_min=0.1, voxel_size=0.1
-):
-    distance_pixels_max = int(distance_cm_max / voxel_size)
-    distance_pixel_min = int(distance_cm_min / voxel_size)
-
-    # Calcular la transformada de distancia
-    distance_transform = ndimage.distance_transform_edt(np.logical_not(mask))
-
-    # Crear la nueva máscara alrededor del tumor core
-    # expanded_mask_distance = distance_transform >= distance_threshold
-    expanded_mask = np.logical_and(
-        distance_transform >= distance_pixel_min,
-        distance_transform <= distance_pixels_max,
-    )
-
-    # Restar la máscara original para obtener solo la región expandida
-    exterior_mask = np.logical_and(expanded_mask, np.logical_not(mask))
-    # Hacer un AND con el edema para eliminar zonas externas a este
-    exterior_mask = np.logical_and(exterior_mask, edema)
-
-    return torch.from_numpy(exterior_mask)
-
-
-class ConvertToMultiChannelBasedOnAnotatedInfiltration(MapTransform):
-    """
-    Convert labels to multi channels based on brats classes:
-    label 2 is edema pure
-    label 6 is infiltrated edema
-    The possible classes are IE (infiltrated edema), PE (pure edema)
-    """
-
-    def __call__(self, data):
-        d = dict(data)
-        for key in self.keys:
-            result = []
-            # label 1 N_ROI
-            result.append(d[key] == 6)
-            # label 2 F_ROI
-            result.append(d[key] == 2)
-            d[key] = torch.stack(result, axis=0).float()
-        return d
-
-
-class ConvertToMultiChannel_with_infiltration(MapTransform):
-    """
-    Convert labels to Nroi + Froi + Edema:
-    label 1 is necrosis
-    label 2 is edema
-    label 3 is activo
-    The possible classes are Nroi (ROI cercana), Froi(ROI lejana), Edema
-
-    """
-
-    def __call__(self, data):
-        d = dict(data)
-        for key in self.keys:
-            result = []
-
-            # label 1 necro
-            necro = d[key] == 1
-            # result.append(necro)
-
-            # label 2 is Edema
-            edema = d[key] == 2
-            # result.append(edema)
-
-            # merge labels 3, 4 and 3 to construct activo
-            active = torch.logical_or(d[key] == 3, d[key] == 4)
-            # result.append(active)
-
-            # Determinar las ROI cercana y lejana al Tumor Core
-            tumor_core_mask = np.logical_or(necro, active)
-
-            # Rellenar los huecos en la máscara
-            filled_tumor_core = fill_holes_3d(tumor_core_mask)
-            # result.append(torch.from_numpy(filled_tumor_core))
-
-            # Definir el tamaño de voxel en centímetros (ajusta según tus datos)
-            voxel_size_cm = 0.1
-
-            # Expandir la máscara de 1 cm alrededor del tumor core (N_ROI)
-            N_roi = expand_mask_3d_td(
-                filled_tumor_core,
-                edema=edema,
-                distance_cm_max=0.5,  # 0.5
-                distance_cm_min=0.1,  # 0.1
-                voxel_size=voxel_size_cm,
-            )
-            result.append(N_roi)
-
-            F_roi = expand_mask_3d_td(
-                filled_tumor_core,
-                edema=edema,
-                distance_cm_max=10,  # 10
-                distance_cm_min=1,  # 1
-                voxel_size=voxel_size_cm,
-            )
-            result.append(F_roi)
-            # result.append(edema)  # comentar para eliminar edema de GT
-
-            d[key] = torch.stack(result, axis=0).float()
-        return d
-
-
-class masked(MapTransform):
-    def __call__(self, data_dict):
-        B = data_dict["label"] == 2
-        B = B.unsqueeze(0).expand(11, -1, -1, -1)
-        data_dict["image"] = data_dict["image"] * B
-        return data_dict
 
 
 #################################
@@ -170,7 +50,7 @@ class masked(MapTransform):
 #################################
 
 ### Hyperparameter
-roi = (128, 128, 64)  # (128, 128, 128)
+roi = (96, 96, 96)  # (128, 128, 128)
 batch_size = 1
 sw_batch_size = 2
 fold = 1
@@ -179,7 +59,8 @@ max_epochs = 100
 val_every = 1
 lr = 1e-4  # default 1e-4
 weight_decay = 1e-5  # default 1e-5
-feature_size=48 # default 48
+feature_size = 72 # default 48 - 72
+use_v2=False
 
 # train_loader, val_loader = get_loader(batch_size, data_dir, json_list, fold, roi)
 
@@ -194,7 +75,10 @@ config_train = SimpleNamespace(
     lr=lr,
     weight_decay=weight_decay,
     feature_size=feature_size,
-    GT="N-ROI + F-ROI d10",  # modifica para eliminar edema "Edema + Infiltration"
+    GT="N-ROI + F-ROI",  # modifica para eliminar edema "Edema + Infiltration"
+    patch_with="tumor",
+    network="original",
+    use_v2=use_v2,
 )
 
 #############################
@@ -207,7 +91,7 @@ api_key = os.environ.get("WANDB_API_KEY")
 wandb.login(key=api_key)
 
 # create a wandb run
-run = wandb.init(project="Swin_UPENN_10casos_pruebas", job_type="train", config=config_train) #Swin_UPENN_106cases
+run = wandb.init(project="Swin_UPENN_29_casos_pruebas", job_type="train", config=config_train) #Swin_UPENN_106cases
 
 # we pass the config back from W&B
 config_train = wandb.config
@@ -274,13 +158,11 @@ def save_checkpoint(model, epoch, filename="model.pt", best_acc=0, dir_add=root_
 train_transform = transforms.Compose(
     [
         transforms.LoadImaged(keys=["image", "label"]),
-        # transforms.ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
-        # masked(keys=["image", "label"]),
-        ConvertToMultiChannel_with_infiltration(keys="label"),
-        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        ConvertToMultiChannelBasedOnN_Froi(keys="label"),
+        #ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
-            source_key="image",
+            source_key="label",
             k_divisible=[roi[0], roi[1], roi[2]],
         ),
         transforms.RandSpatialCropd(
@@ -288,24 +170,18 @@ train_transform = transforms.Compose(
             roi_size=[roi[0], roi[1], roi[2]],
             random_size=False,
         ),
-        transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
-        transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
-        transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=2),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
-        # transforms.RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
-        # transforms.RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
+        
     ]
 )
 val_transform = transforms.Compose(
     [
         transforms.LoadImaged(keys=["image", "label"]),
-        # transforms.ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
-        # masked(keys=["image", "label"]),
-        ConvertToMultiChannel_with_infiltration(keys="label"),
-        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        ConvertToMultiChannelBasedOnN_Froi(keys="label"),
+        # ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
         transforms.RandSpatialCropd(
             keys=["image", "label"],
-            roi_size=[240, 240, 155],
+            roi_size=[-1, -1, -1], #[240, 240, 155],
             random_size=False,
         ),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
@@ -325,6 +201,7 @@ model = SwinUNETR(
     attn_drop_rate=0.0,
     dropout_path_rate=0.0,
     use_checkpoint=True,
+    use_v2=use_v2,
 ).to(device)
 
 ##############################
