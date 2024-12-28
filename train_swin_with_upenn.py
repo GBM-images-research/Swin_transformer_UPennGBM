@@ -50,7 +50,7 @@ logging.basicConfig(level=logging.INFO)
 #################################
 
 ### Hyperparameter
-roi = (96, 96, 96)  # (128, 128, 128)
+roi = (128, 128, 128) # (128, 128, 128) - (96, 96, 96)
 batch_size = 1
 sw_batch_size = 2
 fold = 1
@@ -59,8 +59,9 @@ max_epochs = 100
 val_every = 1
 lr = 1e-4  # default 1e-4
 weight_decay = 1e-5  # default 1e-5
-feature_size = 72 # default 48 - 72
+feature_size = 72 # default 48 - 72 - 96
 use_v2=False
+source_k = "label" # label - image
 
 # train_loader, val_loader = get_loader(batch_size, data_dir, json_list, fold, roi)
 
@@ -76,7 +77,7 @@ config_train = SimpleNamespace(
     weight_decay=weight_decay,
     feature_size=feature_size,
     GT="N-ROI + F-ROI",  # modifica para eliminar edema "Edema + Infiltration"
-    patch_with="tumor",
+    patch_with= source_k, # label - image
     network="original",
     use_v2=use_v2,
 )
@@ -91,7 +92,7 @@ api_key = os.environ.get("WANDB_API_KEY")
 wandb.login(key=api_key)
 
 # create a wandb run
-run = wandb.init(project="Swin_UPENN_29_casos_pruebas", job_type="train", config=config_train) #Swin_UPENN_106cases
+run = wandb.init(project="Swin_UPENN_106cases", job_type="train", config=config_train) # Swin_UPENN_106cases - Swin_UPENN_29_casos_pruebas
 
 # we pass the config back from W&B
 config_train = wandb.config
@@ -162,7 +163,7 @@ train_transform = transforms.Compose(
         #ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
-            source_key="label",
+            source_key=source_k,
             k_divisible=[roi[0], roi[1], roi[2]],
         ),
         transforms.RandSpatialCropd(
@@ -473,7 +474,7 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_29_casos/"
+    dataset_path = "./Dataset/Dataset_331_30_casos/"
 
     train_set = CustomDataset(
         dataset_path, section="train", transform=train_transform
