@@ -59,9 +59,9 @@ max_epochs = 100
 val_every = 1
 lr = 1e-4  # default 1e-4
 weight_decay = 1e-5  # default 1e-5
-feature_size = 72 # default 48 - 72 - 96
+feature_size = 48 # default 48 - 72 - 96
 use_v2=False
-source_k = "label" # label - image
+source_k = "image" # label - image
 
 # train_loader, val_loader = get_loader(batch_size, data_dir, json_list, fold, roi)
 
