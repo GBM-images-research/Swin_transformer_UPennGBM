@@ -222,7 +222,7 @@ class ConvertToMultiChannelBasedOnBratsClassesdCustom(MapTransform):
             # merge labels 3, 4 and 3 to construct activo
             result.append(torch.logical_or(d[key] == 3, d[key] == 4))
 
-            d[key] = torch.stack(result, axis=0).float()
+            d[key] = torch.stack(result, dim=0) 
         return d
 
 ##################
@@ -291,7 +291,7 @@ class ConvertToMultiChannel_with_infiltration1(MapTransform):
 #######################################################
 ## # Dataset manual Edema infiltrado + Edema puro
 ########################################################
-class ConvertToMultiChannelBasedOnAnotatedInfiltration(MapTransform):
+class ConvertToMultiChannelBasedOnAnotatedInfiltrationII(MapTransform):
     """
     Convert labels to multi channels based on brats classes:
     label 2 is edema pure

@@ -38,7 +38,8 @@ from monai.networks.nets import SwinUNETR
 # from monai.data import decollate_batch
 from functools import partial
 
-from src.custom_transforms import ConvertToMultiChannelBasedOnN_Froi, ConvertToMultiChannelBasedOnBratsClassesdI
+# from src.custom_transforms import ConvertToMultiChannelBasedOnN_Froi, ConvertToMultiChannelBasedOnBratsClassesdI
+from src.custom_transforms import ConvertToMultiChannelBasedOnAnotatedInfiltration
 
 ####
 
@@ -55,13 +56,13 @@ batch_size = 1
 sw_batch_size = 2
 fold = 1
 infer_overlap = 0.5
-max_epochs = 100
+max_epochs = 50
 val_every = 1
 lr = 1e-4  # default 1e-4
 weight_decay = 1e-5  # default 1e-5
-feature_size = 48 # default 48 - 72 - 96
+feature_size = 72 # default 48 - 72 - 96
 use_v2=False
-source_k = "image" # label - image
+source_k = "label" # label - image
 
 # train_loader, val_loader = get_loader(batch_size, data_dir, json_list, fold, roi)
 
@@ -92,7 +93,7 @@ api_key = os.environ.get("WANDB_API_KEY")
 wandb.login(key=api_key)
 
 # create a wandb run
-run = wandb.init(project="Swin_UPENN_106cases", job_type="train", config=config_train) # Swin_UPENN_106cases - Swin_UPENN_29_casos_pruebas
+run = wandb.init(project="Swin_UPENN_10cases", job_type="train", config=config_train) # Swin_UPENN_106cases - Swin_UPENN_29_casos_pruebas
 
 # we pass the config back from W&B
 config_train = wandb.config
@@ -159,8 +160,8 @@ def save_checkpoint(model, epoch, filename="model.pt", best_acc=0, dir_add=root_
 train_transform = transforms.Compose(
     [
         transforms.LoadImaged(keys=["image", "label"]),
-        ConvertToMultiChannelBasedOnN_Froi(keys="label"),
-        #ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
+        # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
+        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
             source_key=source_k,
@@ -178,8 +179,8 @@ train_transform = transforms.Compose(
 val_transform = transforms.Compose(
     [
         transforms.LoadImaged(keys=["image", "label"]),
-        ConvertToMultiChannelBasedOnN_Froi(keys="label"),
-        # ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
+        # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
+        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.RandSpatialCropd(
             keys=["image", "label"],
             roi_size=[-1, -1, -1], #[240, 240, 155],
@@ -203,7 +204,7 @@ model = SwinUNETR(
     dropout_path_rate=0.0,
     use_checkpoint=True,
     use_v2=use_v2,
-).to(device)
+)#.to(device)
 
 ##############################
 ### Traer modelo desde WandB #
@@ -234,14 +235,18 @@ model = SwinUNETR(
 ############################
 # Load the model localmente
 #############################
-# weight = torch.load("Dataset/model_dataset_330_30_64x64x64_v01.pt")
-# model.load_from(weights=weight)
-# print(f"Using pretrained model: {weight}")
+model_path = "artifacts/7y5x1mkj_best_model:v0/model.pt" #'Dataset/model_dataset_330_30_96x96x96_48f_v02.pt' # 5mm - mjkearkn_best_model-v0 / 10mm - ip0bojmx_best_model-v0
 
+# Load the model on CPU
+loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
+# model.load_state_dict(torch.load(model_path)["state_dict"])
 
 # Load the state dictionary into the model
-# model.load_state_dict(loaded_model, strict=False)
-# model.load_state_dict(loaded_model["state_dict"])
+model.load_state_dict(loaded_model)
+
+# Move the model to the desired device (e.g., GPU) if available
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model.to(device)
 
 ###########################
 # Optimiser function loss #
@@ -474,7 +479,7 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_331_30_casos/"
+    dataset_path = "./Dataset/Dataset_10_1_casos/"
 
     train_set = CustomDataset(
         dataset_path, section="train", transform=train_transform
