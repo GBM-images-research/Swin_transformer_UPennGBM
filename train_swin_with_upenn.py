@@ -56,13 +56,13 @@ batch_size = 1
 sw_batch_size = 2
 fold = 1
 infer_overlap = 0.5
-max_epochs = 50
+max_epochs = 100
 val_every = 1
 lr = 1e-4  # default 1e-4
 weight_decay = 1e-5  # default 1e-5
 feature_size = 72 # default 48 - 72 - 96
 use_v2=False
-source_k = "label" # label - image
+source_k = "image" # label - image
 
 # train_loader, val_loader = get_loader(batch_size, data_dir, json_list, fold, roi)
 
@@ -482,7 +482,7 @@ def main(config_train):
     dataset_path = "./Dataset/Dataset_10_1_casos/"
 
     train_set = CustomDataset(
-        dataset_path, section="train", transform=train_transform
+        dataset_path, section="train_01", transform=train_transform
     )  # t_transform
     train_loader = DataLoader(
         train_set, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True
@@ -493,7 +493,7 @@ def main(config_train):
     print(im_t["image"].shape)
 
     val_set = CustomDataset(
-        dataset_path, section="valid", transform=val_transform
+        dataset_path, section="valid_01", transform=val_transform
     )  # v_transform
     val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
 
