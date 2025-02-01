@@ -12,6 +12,7 @@ from monai.transforms import (
 from monai.utils.enums import TransformBackends
 from monai.config.type_definitions import NdarrayOrTensor
 
+
 def fill_holes_3d(mask):
     # Rellenar huecos en la máscara 3D
     filled_mask = ndimage.binary_fill_holes(mask)
@@ -39,7 +40,8 @@ def expand_mask_3d_td(
     # Hacer un AND con el edema para eliminar zonas externas a este
     exterior_mask = np.logical_and(exterior_mask, edema)
 
-    return  exterior_mask # torch.from_numpy(exterior_mask)
+    return exterior_mask  # torch.from_numpy(exterior_mask)
+
 
 ######################
 # BraTS original
@@ -60,10 +62,19 @@ class ConvertToMultiChannelBasedOnBratsClassesI(Transform):
         if img.ndim == 4 and img.shape[0] == 1:
             img = img.squeeze(0)
 
-        result = [(img == 1) | (img == 4), (img == 1) | (img == 4) | (img == 2), img == 4]
+        result = [
+            (img == 1) | (img == 4),
+            (img == 1) | (img == 4) | (img == 2),
+            img == 4,
+        ]
         # merge labels 1 (tumor non-enh) and 4 (tumor enh) and 2 (large edema) to WT
         # label 4 is ET
-        return torch.stack(result, dim=0) if isinstance(img, torch.Tensor) else np.stack(result, axis=0)
+        return (
+            torch.stack(result, dim=0)
+            if isinstance(img, torch.Tensor)
+            else np.stack(result, axis=0)
+        )
+
 
 class ConvertToMultiChannelBasedOnBratsClassesdI(MapTransform):
     """
@@ -82,11 +93,12 @@ class ConvertToMultiChannelBasedOnBratsClassesdI(MapTransform):
         super().__init__(keys, allow_missing_keys)
         self.converter = ConvertToMultiChannelBasedOnBratsClassesI()
 
-    def __call__(self, data): 
+    def __call__(self, data):
         d = dict(data)
         for key in self.key_iterator(d):
             d[key] = self.converter(d[key])
         return d
+
 
 ########################
 # NROI + FROI
@@ -139,10 +151,15 @@ class ConvertToMultiChannelBasedOnBratsClassesII(Transform):
             voxel_size=voxel_size_cm,
         )
         result = [
-                torch.from_numpy(N_roi),
-                torch.from_numpy(F_roi),
-            ]
-        return torch.stack(result, dim=0) if isinstance(img, torch.Tensor) else np.stack(result, axis=0) # 
+            torch.from_numpy(N_roi),
+            torch.from_numpy(F_roi),
+        ]
+        return (
+            torch.stack(result, dim=0)
+            if isinstance(img, torch.Tensor)
+            else np.stack(result, axis=0)
+        )  #
+
 
 class ConvertToMultiChannelBasedOnN_Froi(MapTransform):
     """
@@ -161,11 +178,12 @@ class ConvertToMultiChannelBasedOnN_Froi(MapTransform):
         super().__init__(keys, allow_missing_keys)
         self.converter = ConvertToMultiChannelBasedOnBratsClassesII()
 
-    def __call__(self, data): 
+    def __call__(self, data):
         d = dict(data)
         for key in self.key_iterator(d):
             d[key] = self.converter(d[key])
         return d
+
 
 ###############################################
 # Dataset manual Edema infiltrado + Edema puro
@@ -189,16 +207,18 @@ class ConvertToMultiChannelBasedOnAnotatedInfiltration(MapTransform):
             d[key] = torch.stack(result, axis=0).float()
         return d
 
-class masked(MapTransform):
-     #def __init__(self, keys):
-     #     super().__init__(keys)
-          
-     def __call__(self, data_dict):
-          
-          B = data_dict["label"]==2
-          B=B.unsqueeze(0).expand(11, -1, -1, -1)
-          data_dict["image"] = data_dict["image"] * B
-          return data_dict
+
+class masked_1(MapTransform):
+    # def __init__(self, keys):
+    #     super().__init__(keys)
+
+    def __call__(self, data_dict):
+
+        B = data_dict["label"] == 2
+        B = B.unsqueeze(0).expand(11, -1, -1, -1)
+        data_dict["image"] = data_dict["image"] * B
+        return data_dict
+
 
 class ConvertToMultiChannelBasedOnBratsClassesdCustom(MapTransform):
     """
@@ -222,8 +242,9 @@ class ConvertToMultiChannelBasedOnBratsClassesdCustom(MapTransform):
             # merge labels 3, 4 and 3 to construct activo
             result.append(torch.logical_or(d[key] == 3, d[key] == 4))
 
-            d[key] = torch.stack(result, dim=0) 
+            d[key] = torch.stack(result, dim=0)
         return d
+
 
 ##################
 # Con infiltracion
@@ -237,7 +258,8 @@ class ConvertToMultiChannel_with_infiltration1(MapTransform):
     The possible classes are Nroi (ROI cercana), Froi(ROI lejana), Edema
 
     """
-    #backend = [TransformBackends.TORCH, TransformBackends.NUMPY]
+
+    # backend = [TransformBackends.TORCH, TransformBackends.NUMPY]
     def __call__(self, data):
         d = dict(data)
         for key in self.keys:
@@ -284,9 +306,14 @@ class ConvertToMultiChannel_with_infiltration1(MapTransform):
             )
             result.append(F_roi)
             # result.append(edema)  # comentar para eliminar edema de GT
-            
-            d[key] = torch.stack(result, dim=0) if isinstance(img, torch.Tensor) else np.stack(result, axis=0)
+
+            d[key] = (
+                torch.stack(result, dim=0)
+                if isinstance(img, torch.Tensor)
+                else np.stack(result, axis=0)
+            )
         return d
+
 
 #######################################################
 ## # Dataset manual Edema infiltrado + Edema puro
@@ -309,16 +336,19 @@ class ConvertToMultiChannelBasedOnAnotatedInfiltrationII(MapTransform):
             result.append(d[key] == 2)
             d[key] = torch.stack(result, axis=0).float()
         return d
-#######################################################    
+
+
+#######################################################
 # Enmascarar region
 #######################################################
 class masked(MapTransform):
-     #def __init__(self, keys):
-     #     super().__init__(keys)
-          
-     def __call__(self, data_dict):
-          
-          B = data_dict["label"]==2
-          B=B.unsqueeze(0).expand(11, -1, -1, -1)
-          data_dict["image"] = data_dict["image"] * B
-          return data_dict
+    # def __init__(self, keys):
+    #     super().__init__(keys)
+
+    def __call__(self, data_dict):
+        # Tomar B donde data_dict["label"] sea diferente de 0
+        B = data_dict["label"] != 0
+        # B = data_dict["label"]==2
+        B = B.unsqueeze(0).expand(11, -1, -1, -1)
+        data_dict["image"] = data_dict["image"] * B
+        return data_dict

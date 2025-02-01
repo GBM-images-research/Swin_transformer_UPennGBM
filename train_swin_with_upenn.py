@@ -41,7 +41,10 @@ from monai.optimizers.lr_scheduler import WarmupCosineSchedule
 from functools import partial
 
 # from src.custom_transforms import ConvertToMultiChannelBasedOnN_Froi, ConvertToMultiChannelBasedOnBratsClassesdI
-from src.custom_transforms import ConvertToMultiChannelBasedOnAnotatedInfiltration
+from src.custom_transforms import (
+    ConvertToMultiChannelBasedOnAnotatedInfiltration,
+    masked,
+)
 
 ####
 
@@ -53,7 +56,7 @@ logging.basicConfig(level=logging.INFO)
 #################################
 
 ### Hyperparameter
-roi = (128, 128, 128) # (128, 128, 128) - (96, 96, 96)
+roi = (128, 128, 128)  # (128, 128, 128) - (96, 96, 96)
 batch_size = 1
 sw_batch_size = 2
 fold = 1
@@ -62,10 +65,10 @@ max_epochs = 100
 val_every = 1
 lr = 1e-4  # default 1e-4
 weight_decay = 1e-5  # default 1e-5 (proporcional a la regularización que se aplica)
-feature_size = 48 # default 48 - 72 - 96
-use_v2=False
-source_k = "image" # label - image
-dataset_k=("train_all", "train_all") # ("train_00", "valid_00")
+feature_size = 48  # default 48 - 72 - 96
+use_v2 = False
+source_k = "label"  # label - image
+dataset_k = ("train_all", "train_all")  # ("train_00", "valid_00")
 
 print("Train dataset:", dataset_k[0])
 print("Val dataset:", dataset_k[1])
@@ -84,10 +87,10 @@ config_train = SimpleNamespace(
     weight_decay=weight_decay,
     feature_size=feature_size,
     GT="N-ROI + F-ROI",  # modifica para eliminar edema "Edema + Infiltration"
-    patch_with= source_k, # label - image
+    patch_with=source_k,  # label - image
     network="original",
     use_v2=use_v2,
-    dataset=dataset_k
+    dataset=dataset_k,
 )
 
 #############################
@@ -100,7 +103,9 @@ api_key = os.environ.get("WANDB_API_KEY")
 wandb.login(key=api_key)
 
 # create a wandb run
-run = wandb.init(project="Swin_UPENN_10cases", job_type="train", config=config_train) # Swin_UPENN_106cases - Swin_UPENN_29_casos_pruebas
+run = wandb.init(
+    project="Swin_UPENN_10cases", job_type="train", config=config_train
+)  # Swin_UPENN_106cases - Swin_UPENN_29_casos_pruebas
 
 # we pass the config back from W&B
 config_train = wandb.config
@@ -168,6 +173,7 @@ train_transform = transforms.Compose(
     [
         transforms.LoadImaged(keys=["image", "label"]),
         # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
+        masked(keys="image"),
         ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
@@ -180,17 +186,17 @@ train_transform = transforms.Compose(
             random_size=False,
         ),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
-        
     ]
 )
 val_transform = transforms.Compose(
     [
         transforms.LoadImaged(keys=["image", "label"]),
         # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
+        masked(keys="image"),
         ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.RandSpatialCropd(
             keys=["image", "label"],
-            roi_size=[-1, -1, -1], #[240, 240, 155],
+            roi_size=[-1, -1, -1],  # [240, 240, 155],
             random_size=False,
         ),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
@@ -209,7 +215,7 @@ model = SwinUNETR(
     drop_rate=0.0,
     attn_drop_rate=0.0,
     dropout_path_rate=0.0,
-    use_checkpoint=True, # default True para horrar memoria
+    use_checkpoint=True,  # default True para horrar memoria
     use_v2=use_v2,
 ).to(device)
 
@@ -261,14 +267,14 @@ dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
 
 # class_weights = torch.tensor([1.3, 0.7]).to(device)  # Ajusta los pesos según el desequilibrio
 # dice_loss= DiceCELoss(
-#     to_onehot_y=False, 
-#     sigmoid=True, 
+#     to_onehot_y=False,
+#     sigmoid=True,
 #     weight=class_weights
 # )
 
 # dice_loss = DiceFocalLoss(
-#     to_onehot_y=False, 
-#     sigmoid=True, 
+#     to_onehot_y=False,
+#     sigmoid=True,
 #     gamma=2.0  # Ajusta gamma según la sensibilidad deseada (2.0 es un valor común)
 # )
 
@@ -468,11 +474,11 @@ def trainer(
             dices_avg.append(val_avg_acc)
             # Guardar last model
             save_checkpoint(
-                    model,
-                    epoch,
-                    filename="model_last.pt",
-                    best_acc=val_avg_acc,
-                )
+                model,
+                epoch,
+                filename="model_last.pt",
+                best_acc=val_avg_acc,
+            )
             # Guardar best model
             if val_avg_acc > val_acc_max:
                 print("new best ({:.6f} --> {:.6f}). ".format(val_acc_max, val_avg_acc))
@@ -522,7 +528,9 @@ def main(config_train):
     val_set = CustomDataset(
         dataset_path, section=dataset_k[1], transform=val_transform
     )  # v_transform
-    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
+    val_loader = DataLoader(
+        val_set, batch_size=1, shuffle=False, num_workers=4, pin_memory=True
+    )
 
     im_v = val_set[0]
     # (im_t["image"].shape)

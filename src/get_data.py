@@ -141,17 +141,24 @@ def sort_image_list(lista_archivos, patrones):
         return len(patrones)  # Si no se encuentra, lo coloca al final
 
     # Identificar patrones que no están en la lista de archivos
-    patrones_no_encontrados = [patron for patron in patrones if not any(patron in archivo for archivo in lista_archivos)]
+    patrones_no_encontrados = [
+        patron
+        for patron in patrones
+        if not any(patron in archivo for archivo in lista_archivos)
+    ]
 
     # Imprimir alerta si hay patrones no encontrados
     if patrones_no_encontrados:
-        print("¡Alerta! Los siguientes patrones no se encontraron en la lista de archivos:")
+        print(
+            "¡Alerta! Los siguientes patrones no se encontraron en la lista de archivos:"
+        )
         for patron in patrones_no_encontrados:
             print(f" - {patron}")
 
     # Ordenar la lista usando la función de clave
     lista_ordenada = sorted(lista_archivos, key=obtener_orden)
     return lista_ordenada
+
 
 class CustomDataset(Dataset):
     def __init__(self, root_dir, section="train", transform=None):
@@ -169,8 +176,8 @@ class CustomDataset(Dataset):
         """
         image = self.image_files[index]
         label = self.label_files[index]
-        #print(image)
-        #print(label)
+        # print(image)
+        # print(label)
 
         if self.transform is not None:
             data = apply_transform(
@@ -196,9 +203,11 @@ class CustomDataset(Dataset):
 
         modalities = ["images_DSC", "images_DTI", "images_structural"]
         # Lista con el orden estricto de las modalidades
-        modality_order = {"images_DSC":["DSC_ap-rCBV", "DSC_PH", "DSC_PSR"], 
-                  "images_DTI":["DTI_AD", "DTI_FA", "DTI_RD", "DTI_TR"], 
-                  "images_structural":["FLAIR", "T1.", "T1GD", "T2"]}
+        modality_order = {
+            "images_DSC": ["DSC_ap-rCBV", "DSC_PH", "DSC_PSR"],
+            "images_DTI": ["DTI_AD", "DTI_FA", "DTI_RD", "DTI_TR"],
+            "images_structural": ["FLAIR", "T1.", "T1GD", "T2"],
+        }
 
         for modality in modalities:
             modality_files = []
@@ -206,14 +215,15 @@ class CustomDataset(Dataset):
 
             for n, case_folder in enumerate(os.listdir(modality_path)):
                 case_path = os.path.join(modality_path, case_folder)
-                #print(os.listdir(case_path), type(os.listdir(case_path)))
+                # print(os.listdir(case_path), type(os.listdir(case_path)))
 
                 # Obtener los archivos de imágenes para cada caso y modalidad /for file in sorted(os.listdir(case_path))
-                lista=[
-                        os.path.join(case_path, file)
-                        for file in os.listdir(case_path)
-                        if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
-                    ]
+                lista = [
+                    os.path.join(case_path, file)
+                    for file in os.listdir(case_path)
+                    if file.endswith(".nii.gz")
+                    and not file.endswith("segmentation.nii.gz")
+                ]
                 case_files = {n: sort_image_list(lista, modality_order[modality])}
                 # case_files = {
                 #     n: [
@@ -222,7 +232,7 @@ class CustomDataset(Dataset):
                 #         if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
                 #     ]
                 # }
-               
+
                 # Obtener los archivos de imágenes para cada caso y modalidad en el orden estricto
                 # case_files = {
                 #     n: sorted(
@@ -248,7 +258,7 @@ class CustomDataset(Dataset):
                     label_file = os.path.join(
                         section_path,
                         "labels",
-                        f"{case_folder}_combined_approx_segm.nii.gz",  # automated_approx_segm.nii.gz / combined_approx_segm.nii.gz
+                        f"{case_folder}_combined2_approx_segm.nii.gz",  # automated_approx_segm.nii.gz / combined_approx_segm.nii.gz
                     )
 
                 # _automated_approx_segm / _segm
@@ -268,11 +278,10 @@ class CustomDataset(Dataset):
                 converted_list[key] += values[key]
 
         print(f"Found {len(converted_list)} images and {len(label_files)} labels.")
-        #print(f"Image files: {converted_list[318]}")
-        #print(f"Label files: {label_files[318]}")
+        # print(f"Image files: {converted_list[318]}")
+        # print(f"Label files: {label_files[318]}")
         return converted_list, label_files
 
-    
 
 ### Datset para Segmentaci'on de N, Edema y Activo ###
 class CustomDatasetSeg(Dataset):
@@ -405,14 +414,17 @@ def combine_labels(path_label1, path_label2, output_path):
     # Crear un nuevo volumen inicializado en cero
     combined_data = np.zeros_like(label1_data)
 
-    # Conservar solo los voxeles con valor 4 en label1 o valor 6 en label2
+    # Conservar solo los voxeles con valor 2 en label1 o valor 6 en label2
     combined_data[(label1_data == 2.0)] = 2.0
-    combined_data[(label2_data == valores[1])] = 6.0
+    # Si el valor es 6 en label2, y se intercepta con el valor 4 en label1, se conserva el valor 6
+    combined_data[(label1_data == 2.0) & (label2_data == valores[2])] = 6.0
+    # combined_data[(label2_data == valores[1])] = 6.0
 
     # Guardar el nuevo volumen combinado
     save_img(
         combined_data, output_path, header=label1_img.header, affine=label1_img.affine
     )
+
 
 # ####################
 # # Create loader
@@ -477,7 +489,7 @@ def combine_labels(path_label1, path_label2, output_path):
 # def custom_get_loader(data_dir, set_transform, batch_size=1, fold="train", workers=8):
 #     data_dir = data_dir
 #     set_files = load_files(data_dir, fold=fold)
-   
+
 #     set_ds = data.Dataset(data=set_files, transform=set_transform)
 
 #     set_loader = data.DataLoader(
@@ -488,4 +500,3 @@ def combine_labels(path_label1, path_label2, output_path):
 #         pin_memory=True,
 #     )
 #     return set_ds, set_loader
-
