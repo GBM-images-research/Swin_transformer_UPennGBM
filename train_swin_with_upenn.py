@@ -21,7 +21,7 @@ import tempfile
 import matplotlib.pyplot as plt
 import nibabel as nib
 
-from monai.losses import DiceLoss
+from monai.losses import DiceLoss, DiceCELoss, DiceFocalLoss
 from monai.inferers import sliding_window_inference
 from monai import transforms
 from monai.transforms import (
@@ -33,6 +33,8 @@ from monai.utils.enums import TransformBackends
 from monai.metrics import DiceMetric
 from monai.utils.enums import MetricReduction
 from monai.networks.nets import SwinUNETR
+
+from monai.optimizers.lr_scheduler import WarmupCosineSchedule
 
 
 # from monai.data import decollate_batch
@@ -56,11 +58,11 @@ batch_size = 1
 sw_batch_size = 2
 fold = 1
 infer_overlap = 0.5
-max_epochs = 50
+max_epochs = 100
 val_every = 1
 lr = 1e-4  # default 1e-4
-weight_decay = 1e-8  # default 1e-5 (proporcional a la regularización que se aplica)
-feature_size = 72 # default 48 - 72 - 96
+weight_decay = 1e-5  # default 1e-5 (proporcional a la regularización que se aplica)
+feature_size = 48 # default 48 - 72 - 96
 use_v2=False
 source_k = "image" # label - image
 dataset_k=("train_all", "train_all") # ("train_00", "valid_00")
@@ -209,7 +211,7 @@ model = SwinUNETR(
     dropout_path_rate=0.0,
     use_checkpoint=True, # default True para horrar memoria
     use_v2=use_v2,
-)#.to(device)
+).to(device)
 
 ##############################
 ### Traer modelo desde WandB #
@@ -240,26 +242,42 @@ model = SwinUNETR(
 ############################
 # Load the model localmente
 #############################
-model_path = "artifacts/7y5x1mkj_best_model:v0/model.pt" #'Dataset/model_dataset_330_30_96x96x96_48f_v02.pt' # 5mm - mjkearkn_best_model-v0 / 10mm - ip0bojmx_best_model-v0
+# # model_path = "artifacts/7y5x1mkj_best_model:v0/model.pt" #'Dataset/model_dataset_330_30_96x96x96_48f_v02.pt' # 5mm - mjkearkn_best_model-v0 / 10mm - ip0bojmx_best_model-v0
+# model_path = "artifacts/96hevhf7_best_model:v0/model.pt"
+# # Load the model on CPU
+# loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
 
-# Load the model on CPU
-loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
-# model.load_state_dict(torch.load(model_path)["state_dict"])
+# # Load the state dictionary into the model
+# model.load_state_dict(loaded_model)
 
-# Load the state dictionary into the model
-model.load_state_dict(loaded_model)
-
-# Move the model to the desired device (e.g., GPU) if available
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model.to(device)
+# model.to(device)
 
 ###########################
 # Optimiser function loss #
 ###########################
 torch.backends.cudnn.benchmark = True
 dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
+# dice_loss = DiceCELoss(to_onehot_y=False, sigmoid=True)
+
+# class_weights = torch.tensor([1.3, 0.7]).to(device)  # Ajusta los pesos según el desequilibrio
+# dice_loss= DiceCELoss(
+#     to_onehot_y=False, 
+#     sigmoid=True, 
+#     weight=class_weights
+# )
+
+# dice_loss = DiceFocalLoss(
+#     to_onehot_y=False, 
+#     sigmoid=True, 
+#     gamma=2.0  # Ajusta gamma según la sensibilidad deseada (2.0 es un valor común)
+# )
+
+
 post_sigmoid = Activations(sigmoid=True)
 post_pred = AsDiscrete(argmax=False, threshold=0.5)
+# post_sigmoid = Activations(softmax=True)
+# post_pred = AsDiscrete(argmax=True)
+
 dice_acc = DiceMetric(
     include_background=True, reduction=MetricReduction.MEAN_BATCH, get_not_nans=True
 )
@@ -273,6 +291,9 @@ model_inferer = partial(
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max_epochs)
+# scheduler = WarmupCosineSchedule(
+#     optimizer, warmup_steps=5, t_total=max_epochs
+# )
 
 
 # Define Train and Validation Epoch
@@ -325,6 +346,7 @@ def val_epoch(
             acc_func(y_pred=val_output_convert, y=val_labels_list)
             acc, not_nans = acc_func.aggregate()
             run_acc.update(acc.cpu().numpy(), n=not_nans.cpu().numpy())
+            # print("run_acc.avg:", run_acc.avg)
             dice_tc = run_acc.avg[0]
             dice_wt = run_acc.avg[1]
             # dice_et = run_acc.avg[2] # comentar sin edema

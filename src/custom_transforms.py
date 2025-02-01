@@ -309,3 +309,16 @@ class ConvertToMultiChannelBasedOnAnotatedInfiltrationII(MapTransform):
             result.append(d[key] == 2)
             d[key] = torch.stack(result, axis=0).float()
         return d
+#######################################################    
+# Enmascarar region
+#######################################################
+class masked(MapTransform):
+     #def __init__(self, keys):
+     #     super().__init__(keys)
+          
+     def __call__(self, data_dict):
+          
+          B = data_dict["label"]==2
+          B=B.unsqueeze(0).expand(11, -1, -1, -1)
+          data_dict["image"] = data_dict["image"] * B
+          return data_dict
