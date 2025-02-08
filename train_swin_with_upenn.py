@@ -67,7 +67,7 @@ lr = 1e-4  # default 1e-4
 weight_decay = 1e-5  # default 1e-5 (proporcional a la regularización que se aplica)
 feature_size = 48  # default 48 - 72 - 96
 use_v2 = False
-source_k = "label"  # label - image
+source_k = "image"  # label - image
 dataset_k = ("train_all", "train_all")  # ("train_00", "valid_00")
 
 print("Train dataset:", dataset_k[0])
@@ -173,7 +173,7 @@ train_transform = transforms.Compose(
     [
         transforms.LoadImaged(keys=["image", "label"]),
         # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
-        masked(keys="image"),
+        # masked(keys="image"),
         ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
@@ -192,7 +192,7 @@ val_transform = transforms.Compose(
     [
         transforms.LoadImaged(keys=["image", "label"]),
         # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
-        masked(keys="image"),
+        # masked(keys="image"),
         ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
         transforms.RandSpatialCropd(
             keys=["image", "label"],
@@ -217,7 +217,7 @@ model = SwinUNETR(
     dropout_path_rate=0.0,
     use_checkpoint=True,  # default True para horrar memoria
     use_v2=use_v2,
-).to(device)
+)#.to(device)
 
 ##############################
 ### Traer modelo desde WandB #
@@ -248,15 +248,15 @@ model = SwinUNETR(
 ############################
 # Load the model localmente
 #############################
-# # model_path = "artifacts/7y5x1mkj_best_model:v0/model.pt" #'Dataset/model_dataset_330_30_96x96x96_48f_v02.pt' # 5mm - mjkearkn_best_model-v0 / 10mm - ip0bojmx_best_model-v0
-# model_path = "artifacts/96hevhf7_best_model:v0/model.pt"
-# # Load the model on CPU
-# loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
+# model_path = "artifacts/7y5x1mkj_best_model:v0/model.pt" #'Dataset/model_dataset_330_30_96x96x96_48f_v02.pt' # 5mm - mjkearkn_best_model-v0 / 10mm - ip0bojmx_best_model-v0
+model_path = "artifacts/lanbtohe_best_model:v0/model.pt"
+# Load the model on Device
+loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
 
-# # Load the state dictionary into the model
-# model.load_state_dict(loaded_model)
+# Load the state dictionary into the model
+model.load_state_dict(loaded_model)
 
-# model.to(device)
+model.to(device)
 
 ###########################
 # Optimiser function loss #

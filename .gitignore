@@ -170,8 +170,6 @@ Datatest/
 Weights/
 trained_models/
 pruebas.ipynb
-*.ipynb
-ver_transformaciones.ipynb
-simple_inference.ipynb
+
 
 
