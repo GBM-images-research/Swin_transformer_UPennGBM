@@ -425,6 +425,38 @@ def combine_labels(path_label1, path_label2, output_path):
         combined_data, output_path, header=label1_img.header, affine=label1_img.affine
     )
 
+def combine_labels_recurrence(path_label1, path_label2, output_path):
+    # Leer los volúmenes de segmentación
+    label1_img = nib.load(path_label1)
+    label2_img = nib.load(path_label2)
+
+    # Obtener los datos de los volúmenes
+    label1_data = label1_img.get_fdata() # Seg Image base
+    label2_data = label2_img.get_fdata() # Seg Image follow registrada
+
+    # Imprimir los valores que toma el volumen
+    print(np.unique(label1_data))
+    valores = np.unique(label2_data)
+    print(valores)
+
+    # Crear un nuevo volumen inicializado en cero
+    combined_data = np.zeros_like(label1_data)
+
+    # Conservar solo los voxeles con valor 2 en label1 o valor 6 en label2
+    combined_data[(label1_data == 2.0)] = 2.0
+
+     # Obtener los valores de interés: posición 1 y todas las posiciones >= 3
+    valores_interes = np.concatenate(([valores[1]], valores[3:]))  # Unión de posición 1 y >= 3
+
+    # Si el valor de label2 está en valores_interes y label1 es 2.0, asignar 6.0
+    for v in valores_interes:
+        combined_data[(label1_data == 2.0) & (label2_data == v)] = 6.0
+
+    # Guardar el nuevo volumen combinado
+    save_img(
+        combined_data, output_path, header=label1_img.header, affine=label1_img.affine
+    )
+
 
 # ####################
 # # Create loader
