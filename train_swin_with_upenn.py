@@ -62,13 +62,13 @@ sw_batch_size = 2
 fold = 1
 infer_overlap = 0.5
 max_epochs = 100
-val_every = 1
-lr = 1e-4  # default 1e-4
+val_every = 2
+lr = 1e-3  # default 1e-4
 weight_decay = 1e-5  # default 1e-5 (proporcional a la regularización que se aplica)
 feature_size = 48  # default 48 - 72 - 96
 use_v2 = False
-source_k = "image"  # label - image
-dataset_k = ("train_all", "train_all")  # ("train_00", "valid_00")
+source_k = "label"  # label - image
+dataset_k = ("train", "train")  # ("train_00", "valid_00")
 
 print("Train dataset:", dataset_k[0])
 print("Val dataset:", dataset_k[1])
@@ -249,7 +249,7 @@ model = SwinUNETR(
 # Load the model localmente
 #############################
 # model_path = "artifacts/7y5x1mkj_best_model:v0/model.pt" #'Dataset/model_dataset_330_30_96x96x96_48f_v02.pt' # 5mm - mjkearkn_best_model-v0 / 10mm - ip0bojmx_best_model-v0
-model_path = "artifacts/lanbtohe_best_model:v0/model.pt"
+model_path = "artifacts/96hevhf7_best_model:v0/model.pt"
 # Load the model on Device
 loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
 
@@ -296,10 +296,10 @@ model_inferer = partial(
 )
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max_epochs)
-# scheduler = WarmupCosineSchedule(
-#     optimizer, warmup_steps=5, t_total=max_epochs
-# )
+# scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max_epochs)
+scheduler = WarmupCosineSchedule(
+    optimizer, warmup_steps=5, t_total=max_epochs
+)
 
 
 # Define Train and Validation Epoch
@@ -512,13 +512,13 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_10_1_casos/"
+    dataset_path = "./Dataset/Dataset_recurrence/"
 
     train_set = CustomDataset(
         dataset_path, section=dataset_k[0], transform=train_transform
     )  # t_transform
     train_loader = DataLoader(
-        train_set, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True
+        train_set, batch_size=batch_size, shuffle=True, num_workers=1, pin_memory=True
     )
 
     im_t = train_set[0]
