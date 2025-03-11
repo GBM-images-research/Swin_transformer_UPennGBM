@@ -62,7 +62,7 @@ sw_batch_size = 2
 fold = 1
 infer_overlap = 0.5
 max_epochs = 100
-val_every = 2
+val_every = 5
 lr = 1e-3  # default 1e-4
 weight_decay = 1e-5  # default 1e-5 (proporcional a la regularización que se aplica)
 feature_size = 48  # default 48 - 72 - 96
@@ -185,7 +185,12 @@ train_transform = transforms.Compose(
             roi_size=[roi[0], roi[1], roi[2]],
             random_size=False,
         ),
-        transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
+        transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
+        transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
+        transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=2),
+        transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),           
+        transforms.RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
+        transforms.RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
     ]
 )
 val_transform = transforms.Compose(
@@ -249,12 +254,12 @@ model = SwinUNETR(
 # Load the model localmente
 #############################
 # model_path = "artifacts/7y5x1mkj_best_model:v0/model.pt" #'Dataset/model_dataset_330_30_96x96x96_48f_v02.pt' # 5mm - mjkearkn_best_model-v0 / 10mm - ip0bojmx_best_model-v0
-model_path = "artifacts/96hevhf7_best_model:v0/model.pt"
-# Load the model on Device
-loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
+# model_path = "artifacts/96hevhf7_best_model:v0/model.pt"
+# # Load the model on Device
+# loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
 
-# Load the state dictionary into the model
-model.load_state_dict(loaded_model)
+# # Load the state dictionary into the model
+# model.load_state_dict(loaded_model)
 
 model.to(device)
 
@@ -296,10 +301,10 @@ model_inferer = partial(
 )
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-# scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max_epochs)
-scheduler = WarmupCosineSchedule(
-    optimizer, warmup_steps=5, t_total=max_epochs
-)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max_epochs)
+# scheduler = WarmupCosineSchedule(
+#     optimizer, warmup_steps=5, t_total=max_epochs
+# )
 
 
 # Define Train and Validation Epoch
@@ -529,7 +534,7 @@ def main(config_train):
         dataset_path, section=dataset_k[1], transform=val_transform
     )  # v_transform
     val_loader = DataLoader(
-        val_set, batch_size=1, shuffle=False, num_workers=4, pin_memory=True
+        val_set, batch_size=1, shuffle=False, num_workers=1, pin_memory=True
     )
 
     im_v = val_set[0]
