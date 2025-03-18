@@ -43,6 +43,7 @@ from functools import partial
 # from src.custom_transforms import ConvertToMultiChannelBasedOnN_Froi, ConvertToMultiChannelBasedOnBratsClassesdI
 from src.custom_transforms import (
     ConvertToMultiChannelBasedOnAnotatedInfiltration,
+    ConvertToMultiChannelBasedOnBratsClassesdI,
     masked,
 )
 
@@ -56,19 +57,19 @@ logging.basicConfig(level=logging.INFO)
 #################################
 
 ### Hyperparameter
-roi = (128, 128, 128)  # (128, 128, 128) - (96, 96, 96)
+roi = (128, 128, 64)  # (128, 128, 128) - (96, 96, 96)
 batch_size = 1
 sw_batch_size = 2
 fold = 1
 infer_overlap = 0.5
 max_epochs = 100
-val_every = 5
-lr = 1e-3  # default 1e-4
+val_every = 1
+lr = 1e-4  # default 1e-4
 weight_decay = 1e-5  # default 1e-5 (proporcional a la regularización que se aplica)
 feature_size = 48  # default 48 - 72 - 96
 use_v2 = False
 source_k = "label"  # label - image
-dataset_k = ("train", "train")  # ("train_00", "valid_00")
+dataset_k = ("train", "valid")  # ("train_00", "valid_00")
 
 print("Train dataset:", dataset_k[0])
 print("Val dataset:", dataset_k[1])
@@ -86,7 +87,7 @@ config_train = SimpleNamespace(
     lr=lr,
     weight_decay=weight_decay,
     feature_size=feature_size,
-    GT="N-ROI + F-ROI",  # modifica para eliminar edema "Edema + Infiltration"
+    GT="TC + Edema",  # N-ROI + F-ROI / modifica para eliminar edema "Edema + Infiltration"
     patch_with=source_k,  # label - image
     network="original",
     use_v2=use_v2,
@@ -104,7 +105,7 @@ wandb.login(key=api_key)
 
 # create a wandb run
 run = wandb.init(
-    project="Swin_UPENN_10cases", job_type="train", config=config_train
+    project="Swin_UPENN_106cases", job_type="train", config=config_train
 )  # Swin_UPENN_106cases - Swin_UPENN_29_casos_pruebas
 
 # we pass the config back from W&B
@@ -174,7 +175,8 @@ train_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
         # masked(keys="image"),
-        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
             source_key=source_k,
@@ -198,19 +200,20 @@ val_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
         # masked(keys="image"),
-        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
-        transforms.RandSpatialCropd(
-            keys=["image", "label"],
-            roi_size=[-1, -1, -1],  # [240, 240, 155],
-            random_size=False,
-        ),
+        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
+        # transforms.RandSpatialCropd(
+        #     keys=["image", "label"],
+        #     roi_size=[-1, -1, -1],  # [240, 240, 155],
+        #     random_size=False,
+        # ),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
     ]
 )
 
 # Create Swin transformer
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 model = SwinUNETR(
     img_size=roi,
@@ -517,7 +520,8 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_recurrence/"
+    # dataset_path = "./Dataset/Dataset_recurrence/"
+    dataset_path = "./Dataset/Dataset_331_30_casos/"
 
     train_set = CustomDataset(
         dataset_path, section=dataset_k[0], transform=train_transform

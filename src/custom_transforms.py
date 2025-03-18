@@ -64,8 +64,8 @@ class ConvertToMultiChannelBasedOnBratsClassesI(Transform):
 
         result = [
             (img == 1) | (img == 4),
-            (img == 1) | (img == 4) | (img == 2),
-            img == 4,
+            # (img == 1) | (img == 4) | (img == 2),
+            img == 2,
         ]
         # merge labels 1 (tumor non-enh) and 4 (tumor enh) and 2 (large edema) to WT
         # label 4 is ET
