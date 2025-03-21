@@ -69,7 +69,7 @@ weight_decay = 1e-5  # default 1e-5 (proporcional a la regularización que se ap
 feature_size = 48  # default 48 - 72 - 96
 use_v2 = False
 source_k = "label"  # label - image
-dataset_k = ("train", "valid")  # ("train_00", "valid_00")
+dataset_k = ("train", "train")  # ("train_00", "valid_00")
 
 print("Train dataset:", dataset_k[0])
 print("Val dataset:", dataset_k[1])
@@ -105,7 +105,7 @@ wandb.login(key=api_key)
 
 # create a wandb run
 run = wandb.init(
-    project="Swin_UPENN_106cases", job_type="train", config=config_train
+    project="Swin_UPENN_10cases", job_type="train", config=config_train
 )  # Swin_UPENN_106cases - Swin_UPENN_29_casos_pruebas
 
 # we pass the config back from W&B
@@ -175,8 +175,8 @@ train_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
         # masked(keys="image"),
-        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
-        ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
+        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        # ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
             source_key=source_k,
@@ -200,13 +200,13 @@ val_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
         # masked(keys="image"),
-        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
-        ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
-        # transforms.RandSpatialCropd(
-        #     keys=["image", "label"],
-        #     roi_size=[-1, -1, -1],  # [240, 240, 155],
-        #     random_size=False,
-        # ),
+        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        # ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
+        transforms.RandSpatialCropd(
+            keys=["image", "label"],
+            roi_size=[-1, -1, -1],  # [240, 240, 155],
+            random_size=False,
+        ),
         transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
     ]
 )
@@ -257,12 +257,12 @@ model = SwinUNETR(
 # Load the model localmente
 #############################
 # model_path = "artifacts/7y5x1mkj_best_model:v0/model.pt" #'Dataset/model_dataset_330_30_96x96x96_48f_v02.pt' # 5mm - mjkearkn_best_model-v0 / 10mm - ip0bojmx_best_model-v0
-# model_path = "artifacts/96hevhf7_best_model:v0/model.pt"
-# # Load the model on Device
-# loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
+model_path = "artifacts/o9kppyr5_best_model:v0/model.pt"
+# Load the model on Device
+loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
 
-# # Load the state dictionary into the model
-# model.load_state_dict(loaded_model)
+# Load the state dictionary into the model
+model.load_state_dict(loaded_model)
 
 model.to(device)
 
@@ -520,8 +520,8 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    # dataset_path = "./Dataset/Dataset_recurrence/"
-    dataset_path = "./Dataset/Dataset_331_30_casos/"
+    dataset_path = "./Dataset/Dataset_recurrence/"
+    # dataset_path = "./Dataset/Dataset_331_30_casos/"
 
     train_set = CustomDataset(
         dataset_path, section=dataset_k[0], transform=train_transform
