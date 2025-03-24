@@ -258,9 +258,9 @@ class CustomDataset(Dataset):
                     label_file = os.path.join(
                         section_path,
                         "labels",
-                        f"{case_folder}_combined2_approx_segm.nii.gz",  # automated_approx_segm.nii.gz / combined_approx_segm.nii.gz /combined2_approx_segm.nii.gz
-                    )
-
+                        f"{case_folder}_combined3_approx_segm.nii.gz",  
+                    ) # automated_approx_segm.nii.gz / combined_approx_segm.nii.gz /combined2_approx_segm.nii.gz
+                      # combined3_approx_segm.nii.gz
                 # _automated_approx_segm / _segm
 
                 # Verificar si el caso ya ha sido procesado
