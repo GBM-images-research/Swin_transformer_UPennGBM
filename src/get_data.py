@@ -442,15 +442,23 @@ def combine_labels_recurrence(path_label1, path_label2, output_path):
     # Crear un nuevo volumen inicializado en cero
     combined_data = np.zeros_like(label1_data)
 
-    # Conservar solo los voxeles con valor 2 en label1 o valor 6 en label2
-    combined_data[(label1_data == 2.0)] = 2.0
+    #### Infiltracion (6) + edema no infiltrado (2) ###############
+    # # Conservar solo los voxeles con valor 2 en label1 o valor 6 en label2
+    # combined_data[(label1_data == 2.0)] = 2.0
 
-     # Obtener los valores de interés: posición 1 y todas las posiciones >= 3
-    valores_interes = np.concatenate(([valores[1]], valores[3:]))  # Unión de posición 1 y >= 3
+    #  # Obtener los valores de interés: posición 1 y todas las posiciones >= 3
+    # valores_interes = np.concatenate(([valores[1]], valores[3:]))  # Unión de posición 1 y >= 3
 
-    # Si el valor de label2 está en valores_interes y label1 es 2.0, asignar 6.0
-    for v in valores_interes:
-        combined_data[(label1_data == 2.0) & (label2_data == v)] = 6.0
+    # # Si el valor de label2 está en valores_interes y label1 es 2.0, asignar 6.0
+    # for v in valores_interes:
+    #     combined_data[(label1_data == 2.0) & (label2_data == v)] = 6.0
+    ################################################################################
+    #### TC + Infiltracion (6) - Edema (2)
+    # valores_interes = np.concatenate(([valores[1]], valores[2])) 
+    combined_data[(label2_data == valores[1])] = 2.0
+    if len(valores)>2:
+        combined_data[(label2_data == valores[2])] = 6.0
+    combined_data[(label1_data == 1.0) | (label1_data == 4)] = 6.0
 
     # Guardar el nuevo volumen combinado
     save_img(
