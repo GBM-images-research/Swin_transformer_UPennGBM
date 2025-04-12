@@ -68,7 +68,7 @@ lr = 1e-4  # default 1e-4
 weight_decay = 1e-5  # default 1e-5 (proporcional a la regularización que se aplica)
 feature_size = 48  # default 48 - 72 - 96
 use_v2 = False
-source_k = "label"  # label - image
+source_k = "image"  # label - image
 dataset_k = ("train", "train")  # ("train_00", "valid_00")
 
 print("Train dataset:", dataset_k[0])
@@ -87,7 +87,7 @@ config_train = SimpleNamespace(
     lr=lr,
     weight_decay=weight_decay,
     feature_size=feature_size,
-    GT="TC + Infilt + Edema",  # N-ROI + F-ROI / modifica para eliminar edema "Edema + Infiltration"
+    GT="Infilt + Edema",  # N-ROI + F-ROI / TC + Infilt + Edema
     patch_with=source_k,  # label - image
     network="original",
     use_v2=use_v2,
@@ -256,13 +256,13 @@ model = SwinUNETR(
 ############################
 # Load the model localmente
 #############################
-# model_path = "artifacts/7y5x1mkj_best_model:v0/model.pt" #'Dataset/model_dataset_330_30_96x96x96_48f_v02.pt' # 5mm - mjkearkn_best_model-v0 / 10mm - ip0bojmx_best_model-v0
-model_path = "artifacts/o9kppyr5_best_model:v0/model.pt"
-# Load the model on Device
-loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
+# # model_path = "artifacts/7y5x1mkj_best_model:v0/model.pt" #'Dataset/model_dataset_330_30_96x96x96_48f_v02.pt' # 5mm - mjkearkn_best_model-v0 / 10mm - ip0bojmx_best_model-v0
+# model_path = "artifacts/o9kppyr5_best_model:v0/model.pt"
+# # Load the model on Device
+# loaded_model = torch.load(model_path, map_location=torch.device(device))["state_dict"]
 
-# Load the state dictionary into the model
-model.load_state_dict(loaded_model)
+# # Load the state dictionary into the model
+# model.load_state_dict(loaded_model)
 
 model.to(device)
 
