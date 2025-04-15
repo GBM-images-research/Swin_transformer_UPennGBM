@@ -69,7 +69,7 @@ weight_decay = 1e-5  # default 1e-5 (proporcional a la regularización que se ap
 feature_size = 48  # default 48 - 72 - 96
 use_v2 = False
 source_k = "image"  # label - image
-dataset_k = ("train", "train")  # ("train_00", "valid_00")
+dataset_k = ("train", "valid")  # ("train_00", "valid_00")
 
 print("Train dataset:", dataset_k[0])
 print("Val dataset:", dataset_k[1])
@@ -87,7 +87,7 @@ config_train = SimpleNamespace(
     lr=lr,
     weight_decay=weight_decay,
     feature_size=feature_size,
-    GT="Infilt + Edema",  # N-ROI + F-ROI / TC + Infilt + Edema
+    GT="TC+ Edema",  # N-ROI + F-ROI / TC + Infilt + Edema / Infilt + Edema / TC+ Edema
     patch_with=source_k,  # label - image
     network="original",
     use_v2=use_v2,
@@ -175,8 +175,8 @@ train_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
         # masked(keys="image"),
-        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
-        # ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
+        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
         transforms.CropForegroundd(
             keys=["image", "label"],
             source_key=source_k,
@@ -200,8 +200,8 @@ val_transform = transforms.Compose(
         transforms.LoadImaged(keys=["image", "label"]),
         # ConvertToMultiChannelBasedOnN_Froi(keys="label"),
         # masked(keys="image"),
-        ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
-        # ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
+        # ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"),
+        ConvertToMultiChannelBasedOnBratsClassesdI(keys="label"),
         transforms.RandSpatialCropd(
             keys=["image", "label"],
             roi_size=[-1, -1, -1],  # [240, 240, 155],
@@ -520,8 +520,8 @@ def trainer(
 # Load DATASET and training modelo #
 ####################################
 def main(config_train):
-    dataset_path = "./Dataset/Dataset_recurrence/"
-    # dataset_path = "./Dataset/Dataset_331_30_casos/"
+    # dataset_path = "./Dataset/Dataset_recurrence/"
+    dataset_path = "./Dataset/Dataset_331_30_casos/"
 
     train_set = CustomDataset(
         dataset_path, section=dataset_k[0], transform=train_transform
