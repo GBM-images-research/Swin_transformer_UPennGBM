@@ -62,17 +62,17 @@ class ConvertToMultiChannelBasedOnBratsClassesI(Transform):
         if img.ndim == 4 and img.shape[0] == 1:
             img = img.squeeze(0)
         # # Usar con etiquetado BraTS - automated_approx_segm
-        result = [
-            (img == 1) | (img == 4),
-            # (img == 1) | (img == 4) | (img == 2),
-            img == 2,
-        ]
-        # Usar con etiquetado TC+Inf - Edema combined3_approx_segm
         # result = [
-        #     img == 6,
+        #     (img == 1) | (img == 4),
         #     # (img == 1) | (img == 4) | (img == 2),
         #     img == 2,
         # ]
+        # Usar con etiquetado TC+Inf - Edema combined3_approx_segm
+        result = [
+            img == 6,
+            # (img == 1) | (img == 4) | (img == 2),
+            img == 2,
+        ]
         # merge labels 1 (tumor non-enh) and 4 (tumor enh) and 2 (large edema) to WT
         # label 4 is ET
         return (
