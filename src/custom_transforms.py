@@ -61,7 +61,7 @@ class ConvertToMultiChannelBasedOnBratsClassesI(Transform):
         # if img has channel dim, squeeze it
         if img.ndim == 4 and img.shape[0] == 1:
             img = img.squeeze(0)
-        # # Usar con etiquetado BraTS - automated_approx_segm
+        # Usar con etiquetado BraTS - automated_approx_segm
         # result = [
         #     (img == 1) | (img == 4),
         #     # (img == 1) | (img == 4) | (img == 2),
