@@ -1,6 +1,7 @@
 import os
 from glob import glob
 from typing import List, Dict
+import torch
 
 import os
 from monai.data import Dataset, DataLoader
@@ -188,13 +189,18 @@ class CustomDataset(Dataset):
 
         return data["image"], data["label"]
 
+    # def __getitem__(self, index):
+    #     if self.transform:
+    #         image, label = self._transform(index=index)
+    #     return {"image": image, "label": label}
+    
     def __getitem__(self, index):
-        # image_path = self.image_files[index]
-        # label_path = self.label_files[index]
-        # image, label = self._load_data(image_path, label_path)
         if self.transform:
             image, label = self._transform(index=index)
-            # print(image.shape, label.shape)
+        else:
+            # Devolver paths de archivos sin transformar
+            image = self.image_files[index]  # Lista de 11 modalidades
+            label = self.label_files[index]  # Path de la etiqueta
         return {"image": image, "label": label}
 
     def _load_files(self):
@@ -225,27 +231,7 @@ class CustomDataset(Dataset):
                     and not file.endswith("segmentation.nii.gz")
                 ]
                 case_files = {n: sort_image_list(lista, modality_order[modality])}
-                # case_files = {
-                #     n: [
-                #         os.path.join(case_path, file)
-                #         for file in os.listdir(case_path)
-                #         if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
-                #     ]
-                # }
-
-                # Obtener los archivos de imágenes para cada caso y modalidad en el orden estricto
-                # case_files = {
-                #     n: sorted(
-                #         [
-                #             os.path.join(case_path, file)
-                #             for file in os.listdir(case_path)
-                #             if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
-                #         ],
-                #         # Ordenar según la posición del patrón en modality_order
-                #         key=lambda x: next((i for i, pattern in enumerate(modality_order) if pattern in x), float('inf'))
-                #     )
-                # }
-
+               
                 modality_files.append(case_files)
 
                 # Obtener el archivo de etiqueta correspondiente
@@ -261,7 +247,7 @@ class CustomDataset(Dataset):
                         f"{case_folder}_combined3_approx_segm.nii.gz"
                     ) # automated_approx_segm.nii.gz / combined_approx_segm.nii.gz /combined2_approx_segm.nii.gz
                       # combined3_approx_segm.nii.gz
-                # _automated_approx_segm / _segm
+                    # _automated_approx_segm / _segm
 
                 # Verificar si el caso ya ha sido procesado
                 if label_file not in label_files:
@@ -282,6 +268,134 @@ class CustomDataset(Dataset):
         # print(f"Label files: {label_files[318]}")
         return converted_list, label_files
 
+## Custom datset con recurrencia
+class CustomDatasetRec(Dataset):
+    def __init__(self, root_dir, section="train", transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
+        self.section = section
+        self.image_files, self.label_files, self.recurrence_files = self._load_files()
+
+    def __len__(self):
+        return len(self.image_files)
+
+    # def _transform(self, index: int):
+    #     image = self.image_files[index]  # Lista de 11 modalidades
+    #     label = self.label_files[index]  # Path de la etiqueta
+    #     recurrence = self.recurrence_files[index]  # Path de la imagen de recurrencia o None
+
+    #     # Validar paths
+    #     if not all(isinstance(p, str) and os.path.exists(p) for p in image):
+    #         raise ValueError(f"Error en caso {index}: Algunos paths de imagen no son válidos o no existen: {image}")
+    #     if not isinstance(label, str) or not os.path.exists(label):
+    #         raise ValueError(f"Error en caso {index}: Label path no es válido o no existe: {label}")
+
+    #     # Preparar datos para transformaciones
+    #     data = {"image": image, "label": label, "recurrence":recurrence}
+                
+    #     try:
+    #         if self.transform is not None:
+    #             data = apply_transform(self.transform, data=data)
+    #             # Ensure recurrence has correct shape
+    #     except Exception as e:
+    #         raise RuntimeError(f"Error aplicando transformaciones en caso {index}: {e}")        
+    #     return data["image"], data["label"], data["recurrence"]
+    def _transform(self, index: int):
+        image = self.image_files[index]  # Lista de 11 modalidades
+        label = self.label_files[index]  # Path de la etiqueta
+        recurrence = self.recurrence_files[index]  # Path de la imagen de recurrencia o None
+
+        # print(f"\nTransformando caso {index}:")
+        # print(f"  Image paths: {image}")
+        # print(f"  Label path: {label}")
+        # print(f"  Recurrence path: {recurrence}")
+
+        if not all(isinstance(p, str) and os.path.exists(p) for p in image):
+            raise ValueError(f"Error en caso {index}: Algunos paths de imagen no son válidos o no existen: {image}")
+        if not isinstance(label, str) or not os.path.exists(label):
+            raise ValueError(f"Error en caso {index}: Label path no es válido o no existe: {label}")
+
+        data = {"image": image, "label": label, "recurrence":recurrence}
+        
+        try:
+            data = apply_transform(self.transform, data=data, log_stats=True)
+            print(f"After transforms - image shape: {data['image'].shape}, label shape: {data['label'].shape}, recurrence shape: {data['recurrence'].shape}")
+        except Exception as e:
+            raise RuntimeError(f"Error aplicando transformaciones en caso {index}: {e}")
+
+        if "recurrence" not in data:
+
+            data["recurrence"] = torch.zeros(1, 128, 128, 128)  # [C, H, W, D]
+
+        return data["image"], data["label"], data["recurrence"]
+
+    def __getitem__(self, index):
+        if self.transform:
+            image, label, recurrence = self._transform(index=index)
+        else:
+            image = self.image_files[index]
+            label = self.label_files[index]
+            recurrence = self.recurrence_files[index]
+        return {"image": image, "label": label, "recurrence": recurrence, }
+
+    def _load_files(self):
+        image_files, label_files, recurrence_files = [], [], []
+        section_path = os.path.join(self.root_dir, self.section)
+
+        modalities = ["images_DSC", "images_DTI", "images_structural"]
+        modality_order = {
+            "images_DSC": ["DSC_ap-rCBV", "DSC_PH", "DSC_PSR"],
+            "images_DTI": ["DTI_AD", "DTI_FA", "DTI_RD", "DTI_TR"],
+            "images_structural": ["FLAIR", "T1.", "T1GD", "T2"],
+        }
+
+        for modality in modalities:
+            modality_files = []
+            modality_path = os.path.join(section_path, "images", modality)
+
+            for n, case_folder in enumerate(sorted(os.listdir(modality_path))):
+                case_path = os.path.join(modality_path, case_folder)
+                lista = [
+                    os.path.join(case_path, file)
+                    for file in os.listdir(case_path)
+                    if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
+                ]
+                case_files = {n: sort_image_list(lista, modality_order[modality])}
+                modality_files.append(case_files)
+
+                # Extraer el ID base del caso (por ejemplo, UPENN-GBM-00307)
+                case_id = case_folder.split("_")[0]  # Toma UPENN-GBM-00307 de UPENN-GBM-00307_11
+                # print(f"Procesando case_folder: {case_folder}, case_id: {case_id}")  # Depuración
+
+                label_file = os.path.join(section_path, "labels", f"{case_folder}_segm.nii.gz")
+                if not os.path.exists(label_file):
+                    label_file = os.path.join(
+                        section_path, "labels", f"{case_folder}_combined3_approx_segm.nii.gz"
+                    )
+
+                # Obtener el archivo de recurrencia correspondiente
+                recurrence_path = os.path.join(section_path, "recurrence")
+                recurrence_file = os.path.join(recurrence_path, f"{case_id}_21_T1GD_flo_reg.nii.gz")
+                # print(f"Generando recurrence path para {case_id}: {recurrence_file}")  # Depuración
+                if not os.path.exists(recurrence_file):
+                    print(f"Advertencia: No se encontró recurrence file: {recurrence_file}")
+                    recurrence_file = None
+                    
+
+                if label_file not in label_files and os.path.exists(label_file):
+                    label_files.append(label_file)
+                    recurrence_files.append(recurrence_file)
+
+            image_files.append(modality_files)
+
+        converted_list = [[] for _ in range(len(image_files[0]))]
+        for l in image_files:
+            for key, values in enumerate(l):
+                converted_list[key] += values[key]
+
+        print(f"Found {len(converted_list)} images, {len(label_files)} labels, "
+              f"and {len(recurrence_files)} recurrence files.")
+        return converted_list, label_files, recurrence_files
 
 ### Datset para Segmentaci'on de N, Edema y Activo ###
 class CustomDatasetSeg(Dataset):
@@ -305,6 +419,7 @@ class CustomDatasetSeg(Dataset):
             data = apply_transform(
                 self.transform,
                 data={"image": image, "label": label},
+                log_stats=True,
             )
             # label = apply_transform(self.transform, label)
 
