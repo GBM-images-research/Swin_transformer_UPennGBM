@@ -370,8 +370,11 @@ class CustomDatasetRec(Dataset):
                 label_file = os.path.join(section_path, "labels", f"{case_folder}_segm.nii.gz")
                 if not os.path.exists(label_file):
                     label_file = os.path.join(
-                        section_path, "labels", f"{case_folder}_combined3_approx_segm.nii.gz"
+                        section_path, "labels", f"{case_folder}_automated_approx_segm.nii.gz"
                     )
+                    # combined2_approx_segm.nii.gz -> infiltracion + vasogenico
+                    # combined3_approx_segm.nii.gz -> (TC-infiltracion) + vasogenico
+                    # automated_approx_segm.nii.gz -> TC + edema
 
                 # Obtener el archivo de recurrencia correspondiente
                 recurrence_path = os.path.join(section_path, "recurrence")
