@@ -210,7 +210,7 @@ class CustomDataset(Dataset):
         modalities = ["images_DSC", "images_DTI", "images_structural"]
         # Lista con el orden estricto de las modalidades
         modality_order = {
-            "images_DSC": ["DSC_ap-rCBV", "DSC_PH", "DSC_PSR"],
+            "images_DSC": ["DSC_ap-rCBV", "DSC_PH", "DSC_PSR"], # "DSC_ap-rCBV", "DSC_PH", "DSC_PSR"
             "images_DTI": ["DTI_AD", "DTI_FA", "DTI_RD", "DTI_TR"],
             "images_structural": ["FLAIR", "T1.", "T1GD", "T2"],
         }
@@ -229,10 +229,13 @@ class CustomDataset(Dataset):
                     for file in os.listdir(case_path)
                     if file.endswith(".nii.gz")
                     and not file.endswith("segmentation.nii.gz")
+                    # and not file.endswith("DSC_PH.nii.gz")
                 ]
                 case_files = {n: sort_image_list(lista, modality_order[modality])}
-               
+
+                
                 modality_files.append(case_files)
+
 
                 # Obtener el archivo de etiqueta correspondiente
                 label_file = os.path.join(
@@ -244,10 +247,12 @@ class CustomDataset(Dataset):
                     label_file = os.path.join(
                         section_path,
                         "labels",
-                        f"{case_folder}_combined3_approx_segm.nii.gz"
+                        f"{case_folder}_combined2_approx_segm.nii.gz"
                     ) # automated_approx_segm.nii.gz / combined_approx_segm.nii.gz /combined2_approx_segm.nii.gz
-                      # combined3_approx_segm.nii.gz
-                    # _automated_approx_segm / _segm
+                   
+                    # combined2_approx_segm.nii.gz -> infiltracion + vasogenico (ConvertToMultiChannelBasedOnAnotatedInfiltration(keys="label"))
+                    # combined3_approx_segm.nii.gz -> (TC-infiltracion) + vasogenico
+                    # automated_approx_segm.nii.gz -> TC + edema
 
                 # Verificar si el caso ya ha sido procesado
                 if label_file not in label_files:
@@ -344,7 +349,7 @@ class CustomDatasetRec(Dataset):
 
         modalities = ["images_DSC", "images_DTI", "images_structural"]
         modality_order = {
-            "images_DSC": ["DSC_ap-rCBV", "DSC_PH", "DSC_PSR"],
+            "images_DSC": ["DSC_ap-rCBV", "DSC_PSR"], # "DSC_ap-rCBV", "DSC_PH", "DSC_PSR"
             "images_DTI": ["DTI_AD", "DTI_FA", "DTI_RD", "DTI_TR"],
             "images_structural": ["FLAIR", "T1.", "T1GD", "T2"],
         }
@@ -358,7 +363,7 @@ class CustomDatasetRec(Dataset):
                 lista = [
                     os.path.join(case_path, file)
                     for file in os.listdir(case_path)
-                    if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz")
+                    if file.endswith(".nii.gz") and not file.endswith("segmentation.nii.gz") and not file.endswith("DSC_PH.nii.gz")
                 ]
                 case_files = {n: sort_image_list(lista, modality_order[modality])}
                 modality_files.append(case_files)
@@ -370,7 +375,7 @@ class CustomDatasetRec(Dataset):
                 label_file = os.path.join(section_path, "labels", f"{case_folder}_segm.nii.gz")
                 if not os.path.exists(label_file):
                     label_file = os.path.join(
-                        section_path, "labels", f"{case_folder}_automated_approx_segm.nii.gz"
+                        section_path, "labels", f"{case_folder}_combined2_approx_segm.nii.gz"
                     )
                     # combined2_approx_segm.nii.gz -> infiltracion + vasogenico
                     # combined3_approx_segm.nii.gz -> (TC-infiltracion) + vasogenico
