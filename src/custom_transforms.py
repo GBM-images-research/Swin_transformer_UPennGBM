@@ -75,20 +75,31 @@ class ConvertToMultiChannelPipeline1d(MapTransform):
 
     def __call__(self, data):
         d = dict(data)
+        # Identificamos el origen del caso (UPENN por defecto en inferencia)
+        source = d.get("source", "UPENN")
+        
         for key in self.keys:
             img = d[key]
-            if img.ndim == 4 and img.shape[0] == 1: img = img.squeeze(0)
+            if img.ndim == 4 and img.shape[0] == 1: 
+                img = img.squeeze(0)
 
-            # 1. El núcleo sólido
-            tc = (img == 1) | (img == 4) | (img == 3)
+            # --- Lógica Diferenciada por Origen ---
+            if source == "UPENN":
+                # Tumor Core: Necrosis (1) + Enhancing (4)
+                tc = (img == 1) | (img == 4)
+            else:
+                # Tumor Core MU-GLIOMA: Necrosis (1) + Enhancing (3) + Cavidad (4)
+                tc = (img == 1) | (img == 3) | (img == 4)
             
-            # 2. La masa total sólida (Núcleo + Edema)
+            # La masa total sólida (Núcleo + Edema) siempre es 2 en ambas BD
             wt = tc | (img == 2)
             
             result = [tc, wt]
-            d[key] = torch.stack(result, dim=0).float() if isinstance(img, torch.Tensor) else np.stack(result, axis=0).astype(np.float32)
+            if isinstance(img, torch.Tensor):
+                d[key] = torch.stack(result, dim=0).float()
+            else:
+                d[key] = np.stack(result, axis=0).astype(np.float32)
         return d
-
 
 class ConvertToMultiChannelPipeline2d(MapTransform):
     """
@@ -100,27 +111,93 @@ class ConvertToMultiChannelPipeline2d(MapTransform):
 
     def __call__(self, data):
         d = dict(data)
+        source = d.get("source", "UPENN")
+        
         for key in self.keys:
             img = d[key]
-            if img.ndim == 4 and img.shape[0] == 1: img = img.squeeze(0)
+            if img.ndim == 4 and img.shape[0] == 1: 
+                img = img.squeeze(0)
 
-            # 1. Identificar componentes básicos
-            # En MU-Glioma P2 el núcleo ahora es 4. En UPenn el núcleo es 1 o 4.
-            core_base = (img == 4) | (img == 1) | (img == 3) 
-            
-            # La infiltración (1 en MU-Glioma, 6 en UPenn)
-            infilt = (img == 1) | (img == 6)
+            # --- Lógica Diferenciada para Evitar Colisión de la Etiqueta 1 ---
+            if source == "UPENN":
+                # Core: Necrosis (1) + Enhancing (4) | Infiltración (6)
+                core_base = (img == 1) | (img == 4)
+                infilt = (img == 6)
+            else:
+                # MU-GLIOMA (Generado en offline): 
+                # El Core + Cavidad se agrupó en 4. La infiltración pura es 1.
+                core_base = (img == 4)
+                infilt = (img == 1)
 
-            # 2. Construir Sólidos Jerárquicos
-            # CANAL 0: Extended Target (Núcleo Original + Infiltración) -> MASA SÓLIDA
+            # 1. CANAL 0: Extended Target (Núcleo Original/Cavidad + Infiltración) -> MASA SÓLIDA
             extended_target = core_base | infilt
             
-            # CANAL 1: Whole Abnormal Area (Extended Target + Edema Puro) -> MASA SÓLIDA GLOBAL
+            # 2. CANAL 1: Whole Abnormal Area (Extended Target + Edema Puro) -> MASA SÓLIDA GLOBAL
             whole_abnormal = extended_target | (img == 2)
             
             result = [extended_target, whole_abnormal]
-            d[key] = torch.stack(result, dim=0).float() if isinstance(img, torch.Tensor) else np.stack(result, axis=0).astype(np.float32)
+            if isinstance(img, torch.Tensor):
+                d[key] = torch.stack(result, dim=0).float()
+            else:
+                d[key] = np.stack(result, axis=0).astype(np.float32)
         return d
+    
+# class ConvertToMultiChannelPipeline1d(MapTransform):
+#     """
+#     PIPELINE 1: Modelo Base (Sólidos Anidados)
+#     Salida: [Canal 0: Tumor Core Sólido, Canal 1: Whole Tumor Sólido]
+#     """
+#     def __init__(self, keys, allow_missing_keys=False):
+#         super().__init__(keys, allow_missing_keys)
+
+#     def __call__(self, data):
+#         d = dict(data)
+#         for key in self.keys:
+#             img = d[key]
+#             if img.ndim == 4 and img.shape[0] == 1: img = img.squeeze(0)
+
+#             # 1. El núcleo sólido
+#             tc = (img == 1) | (img == 4) | (img == 3)
+            
+#             # 2. La masa total sólida (Núcleo + Edema)
+#             wt = tc | (img == 2)
+            
+#             result = [tc, wt]
+#             d[key] = torch.stack(result, dim=0).float() if isinstance(img, torch.Tensor) else np.stack(result, axis=0).astype(np.float32)
+#         return d
+
+
+# class ConvertToMultiChannelPipeline2d(MapTransform):
+#     """
+#     Conversor para PIPELINE 2 (Sólidos Anidados Extendidos)
+#     Salida: [Canal 0: Target Extendido Sólido, Canal 1: Whole Abnormal Area Sólida]
+#     """
+#     def __init__(self, keys, allow_missing_keys=False):
+#         super().__init__(keys, allow_missing_keys)
+
+#     def __call__(self, data):
+#         d = dict(data)
+#         for key in self.keys:
+#             img = d[key]
+#             if img.ndim == 4 and img.shape[0] == 1: img = img.squeeze(0)
+
+#             # 1. Identificar componentes básicos
+#             # En MU-Glioma P2 el núcleo ahora es 4. En UPenn el núcleo es 1 o 4.
+#             core_base = (img == 4) | (img == 1) | (img == 3) 
+            
+#             # La infiltración (1 en MU-Glioma, 6 en UPenn)
+#             infilt = (img == 1) | (img == 6)
+
+#             # 2. Construir Sólidos Jerárquicos
+#             # CANAL 0: Extended Target (Núcleo Original + Infiltración) -> MASA SÓLIDA
+#             extended_target = core_base | infilt
+            
+#             # CANAL 1: Whole Abnormal Area (Extended Target + Edema Puro) -> MASA SÓLIDA GLOBAL
+#             whole_abnormal = extended_target | (img == 2)
+            
+#             result = [extended_target, whole_abnormal]
+#             d[key] = torch.stack(result, dim=0).float() if isinstance(img, torch.Tensor) else np.stack(result, axis=0).astype(np.float32)
+#         return d
 
 # class ConvertToMultiChannelPipeline1d(MapTransform):
 #     """

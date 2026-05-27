@@ -76,7 +76,7 @@ run = wandb.init(
 )
 config_train = wandb.config
 
-directory = "./Dataset_Output_P2"
+directory = "./Dataset_Output"
 os.makedirs(directory, exist_ok=True)
 print(f"Output directory: {directory}")
 

@@ -146,7 +146,6 @@ train_transform = transforms.Compose([
     
     transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),            
     
-    # --- CORRECCIÓN CLÍNICA PARA INFILTRACIÓN SUTIL ---
     # Probabilidad bajada al 30%, factor bajado al 5%
     transforms.RandScaleIntensityd(keys="image", factors=0.05, prob=0.3),
     transforms.RandShiftIntensityd(keys="image", offsets=0.05, prob=0.3),
@@ -188,11 +187,11 @@ model = SwinUNETR(
     use_v2=use_v2,
 )
 
-model_path = "trained_models/vtzpbajf_best_model_pipe1/model.pt"
-if os.path.exists(model_path):
-    loaded_model = torch.load(model_path, map_location=device)["state_dict"]
-    model.load_state_dict(loaded_model)
-    print(f"Modelo preentrenado cargado desde {model_path}")
+# model_path = "trained_models/vtzpbajf_best_model_pipe1/model.pt"
+# if os.path.exists(model_path):
+#     loaded_model = torch.load(model_path, map_location=device)["state_dict"]
+#     model.load_state_dict(loaded_model)
+#     print(f"Modelo preentrenado cargado desde {model_path}")
 
 model.to(device)
 

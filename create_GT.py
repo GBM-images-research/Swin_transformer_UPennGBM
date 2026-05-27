@@ -40,22 +40,35 @@ def generate_custom_masks(base_dir):
                 continue
             
             # --- 1. CARGA DE MÁSCARA BASE ---
+            # img_base = nib.load(base_mask_file)
+            # mask_base = img_base.get_fdata().astype(np.uint8)
+            # affine = img_base.affine
+            # header = img_base.header
+            
+            # # Definición de etiquetas base (1: Necrosis, 2: Edema, 3: Enhancing Tumor, 4: Cavidad)
+            # tc_base = (mask_base == 1) | (mask_base == 3)
+            # edema_base = (mask_base == 2)
+            # rc_base = (mask_base == 4)
+           
             img_base = nib.load(base_mask_file)
             mask_base = img_base.get_fdata().astype(np.uint8)
             affine = img_base.affine
             header = img_base.header
             
             # Definición de etiquetas base (1: Necrosis, 2: Edema, 3: Enhancing Tumor, 4: Cavidad)
-            tc_base = (mask_base == 1) | (mask_base == 3)
+            # CORRECCIÓN TOPOLÓGICA: Integramos la cavidad (4) al Tumor Core para 
+            # consolidar el "Lecho Quirúrgico Sólido" y evitar la topología de dona.
+            tc_base = (mask_base == 1) | (mask_base == 3) | (mask_base == 4)
+            
             edema_base = (mask_base == 2)
-            rc_base = (mask_base == 4)
+            rc_base = (mask_base == 4) # La mantenemos definida por si acaso
             
             # =================================================================
             # PIPELINE 1: MÁSCARA 1 (Tumor Core vs Edema Total)
             # Se genera SIEMPRE, sin importar si hay un punto temporal siguiente
             # =================================================================
             mask_1 = np.zeros_like(mask_base)
-            mask_1[tc_base] = 1      # Clase 1: Tumor Core
+            mask_1[tc_base] = 1      # Clase 1: Tumor Core (¡Ahora incluye la cavidad sólida!)
             mask_1[edema_base] = 2   # Clase 2: Edema Total
             # La cavidad (rc_base) y el resto quedan en 0 (Background)
             
@@ -114,7 +127,7 @@ def generate_custom_masks(base_dir):
                 print(f"    ℹ️ Nodo final ({t_base}). No se genera Máscara 2.")
 
 # --- EJECUCIÓN ---
-directorios_a_procesar = ['Dataset/MU_glioma/val']
+directorios_a_procesar = ['Dataset/MU_glioma/test']
 
 for directorio in directorios_a_procesar:
     if os.path.exists(directorio):
