@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import wandb
 
 from monai.data import DataLoader, decollate_batch
-from monai.losses import DiceLoss
+from monai.losses import DiceLoss, DiceFocalLoss
 from monai.inferers import sliding_window_inference
 from monai import transforms
 from monai.transforms import AsDiscrete, Activations
@@ -27,7 +27,7 @@ from src.get_data import UnifiedDataset
 from src.custom_transforms import (
     ImputeMissingChannelsd,
     RandModalityDropoutd,
-    ConvertToMultiChannelPipeline1d
+    ConvertToMultiChannelPipeline2d  # <-- Transformación para Pipeline 2
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +39,7 @@ roi = (128, 128, 64)
 batch_size = 1
 sw_batch_size = 2
 infer_overlap = 0.5
-max_epochs = 100
+max_epochs = 200
 val_every = 1
 lr = 1e-4
 weight_decay = 1e-5
@@ -56,7 +56,7 @@ config_train = SimpleNamespace(
     lr=lr,
     weight_decay=weight_decay,
     feature_size=feature_size,
-    pipeline="Pipeline 1: Tumor Core + Whole Tumor",
+    pipeline="Pipeline 2: Extended Target vs Whole Abnormal Area", # Actualizado semánticamente
     network="SwinUNETR",
     use_v2=use_v2,
 )
@@ -70,13 +70,13 @@ if api_key:
     wandb.login(key=api_key)
 
 run = wandb.init(
-    project="Swin_Unified_Pipeline1", 
+    project="Swin_Unified_Pipeline2",  
     job_type="train", 
     config=config_train
 )
 config_train = wandb.config
 
-directory = "./Dataset_Output"
+directory = "./Dataset_Output_P2"
 os.makedirs(directory, exist_ok=True)
 print(f"Output directory: {directory}")
 
@@ -115,8 +115,8 @@ train_transform = transforms.Compose([
     ImputeMissingChannelsd(keys=["image"]),
     RandModalityDropoutd(keys=["image"], prob=0.5),
     
-    # Formateo de Etiquetas a 2 Canales (TC, WT/Whole Tumor)
-    ConvertToMultiChannelPipeline1d(keys=["label"]),
+    # Formateo de Etiquetas PARA PIPELINE 2 (Sólidos Anidados)
+    ConvertToMultiChannelPipeline2d(keys=["label"]),
     
     # --- Recorte y Aumentación Espacial OPTIMIZADOS ---
     transforms.CropForegroundd(
@@ -127,6 +127,7 @@ train_transform = transforms.Compose([
         allow_smaller=False  
     ),
     
+    # Muestreo Balanceado
     transforms.RandCropByPosNegLabeld(
         keys=["image", "label"],
         label_key="label",
@@ -156,9 +157,11 @@ val_transform = transforms.Compose([
     transforms.LoadImaged(keys=["image", "label"]),
     transforms.EnsureChannelFirstd(keys=["image", "label"]),
     
+    # Unificación de canales (sin dropout en val)
     ImputeMissingChannelsd(keys=["image"]),
-    ConvertToMultiChannelPipeline1d(keys=["label"]),
+    ConvertToMultiChannelPipeline2d(keys=["label"]),
     
+    # Recorte inteligente para sliding window (Mantenido para validación rápida)
     transforms.CropForegroundd(
         keys=["image", "label"], 
         source_key="image",
@@ -188,11 +191,14 @@ model = SwinUNETR(
     use_v2=use_v2,
 )
 
-model_path = "trained_models/vtzpbajf_best_model_pipe1/model.pt"
+# TRANSFER LEARNING: Cargar pesos del Pipeline 1
+model_path = "Dataset_Output/pipe1/snowy-dream-8/model_best.pt"
 if os.path.exists(model_path):
     loaded_model = torch.load(model_path, map_location=device)["state_dict"]
     model.load_state_dict(loaded_model)
-    print(f"Modelo preentrenado cargado desde {model_path}")
+    print(f"Transfer Learning: Pesos de P1 cargados desde {model_path}")
+else:
+    print(f"⚠️ Atención: No se encontró el modelo base en {model_path}. Entrenando desde cero.")
 
 model.to(device)
 
@@ -200,7 +206,18 @@ model.to(device)
 # OPTIMIZADOR Y PÉRDIDA
 ###########################
 torch.backends.cudnn.benchmark = True
-dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
+# dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
+
+# NUEVO: DiceFocalLoss obliga a la red a salir de su "zona de confort"
+# gamma=2.0 es el estándar de oro para enfocar la red en píxeles difíciles.
+# lambda_dice y lambda_focal equilibran ambos castigos.
+dice_loss = DiceFocalLoss(
+    to_onehot_y=False, 
+    sigmoid=True, 
+    gamma=2.0, 
+    lambda_dice=1.0, 
+    lambda_focal=1.0
+)
 
 post_sigmoid = Activations(sigmoid=True)
 post_pred = AsDiscrete(argmax=False, threshold=0.5)
@@ -233,7 +250,7 @@ def train_epoch(model, loader, optimizer, epoch, loss_func):
         optimizer.step()
         optimizer.zero_grad() 
         
-        # Corrección: usar data.shape[0] es más robusto que batch_size global
+        # Corrección: data.shape[0] para robustez del batch
         run_loss.update(loss.item(), n=data.shape[0])
         print("Epoch {}/{} {}/{} loss: {:.4f} time {:.2f}s".format(
             epoch, max_epochs, idx, len(loader), run_loss.avg, time.time() - start_time))
@@ -259,10 +276,11 @@ def val_epoch(model, loader, epoch, acc_func, model_inferer, post_sigmoid, post_
             acc, not_nans = acc_func.aggregate()
             run_acc.update(acc.cpu().numpy(), n=not_nans.cpu().numpy())
             
-            dice_tc = run_acc.avg[0]
-            dice_wt = run_acc.avg[1]
-            print("Val {}/{} {}/{} , dice_tc: {:.4f} , dice_wt: {:.4f} , time {:.2f}s".format(
-                epoch, max_epochs, idx, len(loader), dice_tc, dice_wt, time.time() - start_time))
+            # --- Corrección Semántica de Variables (Sólidos Anidados P2) ---
+            dice_ext_target = run_acc.avg[0]    # Canal 0: Extended Target (Core + Infilt)
+            dice_whole_abnormal = run_acc.avg[1] # Canal 1: Whole Abnormal Area
+            print("Val {}/{} {}/{} , dice_ext_target: {:.4f} , dice_whole_abnormal: {:.4f} , time {:.2f}s".format(
+                epoch, max_epochs, idx, len(loader), dice_ext_target, dice_whole_abnormal, time.time() - start_time))
             start_time = time.time()
     return run_acc.avg
 
@@ -285,17 +303,18 @@ def trainer(model, train_loader, val_loader, optimizer, loss_func, acc_func, sch
         if (epoch + 1) % val_every == 0 or epoch == 0:
             epoch_time = time.time()
             val_acc = val_epoch(model, val_loader, epoch, acc_func, model_inferer, post_sigmoid, post_pred)
-            dice_tc = val_acc[0]
-            dice_wt = val_acc[1]
+            
+            dice_ext_target = val_acc[0]
+            dice_whole_abnormal = val_acc[1]
             val_avg_acc = np.mean(val_acc)
             
-            print("Final validation stats {}/{} , dice_tc: {:.4f} , dice_wt: {:.4f} , Dice_Avg: {:.4f} , time {:.2f}s".format(
-                epoch, max_epochs - 1, dice_tc, dice_wt, val_avg_acc, time.time() - epoch_time))
+            print("Final validation stats {}/{} , dice_ext_target: {:.4f} , dice_whole_abnormal: {:.4f} , Dice_Avg: {:.4f} , time {:.2f}s".format(
+                epoch, max_epochs - 1, dice_ext_target, dice_whole_abnormal, val_avg_acc, time.time() - epoch_time))
             
-            # Corrección: Cambiado 'val_dice_edema' a 'val_dice_wt' para evitar confusiones topológicas
+            # --- Actualización WandB ---
             wandb.log({
-                "val_dice_tc": dice_tc,
-                "val_dice_wt": dice_wt,
+                "val_dice_ext_target": dice_ext_target,
+                "val_dice_whole_abnormal": dice_whole_abnormal,
                 "val_dice_avg": val_avg_acc,
             })
             
@@ -310,8 +329,9 @@ def trainer(model, train_loader, val_loader, optimizer, loss_func, acc_func, sch
         
     print("Training Finished! Best Accuracy: ", val_acc_max)
     
+    # Save artifact in W&B
     if wandb.run is not None:
-        artifact_name = f"{wandb.run.id}_best_model"
+        artifact_name = f"{wandb.run.id}_best_model_p2"
         at = wandb.Artifact(artifact_name, type="model")
         at.add_file(os.path.join(directory, "model_best.pt"))
         wandb.log_artifact(at, aliases=["final"])
@@ -322,9 +342,10 @@ def trainer(model, train_loader, val_loader, optimizer, loss_func, acc_func, sch
 # Carga de Datos y Ejecución
 ####################################
 def main(config_train):
-    UPENN_DIR = "./Dataset/Dataset_331_30_casos/"
+    # Ajustar a las rutas del Pipeline 2
+    UPENN_DIR = "./Dataset/Dataset_30_6/"
     MUGLIOMA_DIR = "./Dataset/MU_glioma/"
-    PIPELINE = 1 
+    PIPELINE = 2 
 
     print(f"\n--- INICIANDO CARGA PARA PIPELINE {PIPELINE} ---")
     train_set = UnifiedDataset(

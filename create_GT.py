@@ -78,20 +78,34 @@ def generate_custom_masks(base_dir):
                     
                     if mask_base.shape == mask_follow.shape:
                         tc_follow = (mask_follow == 1) | (mask_follow == 3)
-                        
+                        # PIPELINE 2: MÁSCARA 2 (Tumor Core + Infiltración + Edema Puro)
                         mask_2 = np.zeros_like(mask_base)
                         
-                        # Infiltración: TC del follow que NO es TC de la base y NO es cavidad
+                        # # Infiltración: TC del follow que NO es TC de la base y NO es cavidad
+                        
                         infiltration = tc_follow & (~tc_base) & (~rc_base)
                         # Edema Puro: Edema base que NO se infiltró
                         pure_edema = edema_base & (~infiltration)
                         
-                        mask_2[infiltration] = 1 # Clase 1: Infiltración
-                        mask_2[pure_edema] = 2   # Clase 2: Edema Puro
+                        # GUARDAMOS LAS 3 ESTRUCTURAS
+                        mask_2[tc_base] = 4       # Clase 4: Tumor Core original (El centro sólido)
+                        mask_2[infiltration] = 1  # Clase 1: Infiltración (El anillo interno)
+                        mask_2[pure_edema] = 2    # Clase 2: Edema Puro (El anillo externo)
                         
                         out_file_2 = os.path.join(pat_path, t_base, f"{patient_id}_{t_base}_tumorMask_2.nii.gz")
                         nib.save(nib.Nifti1Image(mask_2, affine, header), out_file_2)
                         print(f"    ↳ Par válido ({t_base} -> {t_follow}) -> Generada Máscara 2 (P2)")
+
+                        # infiltration = tc_follow & (~tc_base) & (~rc_base)
+                        # # Edema Puro: Edema base que NO se infiltró
+                        # pure_edema = edema_base & (~infiltration)
+                        
+                        # mask_2[infiltration] = 1 # Clase 1: Infiltración
+                        # mask_2[pure_edema] = 2   # Clase 2: Edema Puro
+                        
+                        # out_file_2 = os.path.join(pat_path, t_base, f"{patient_id}_{t_base}_tumorMask_2.nii.gz")
+                        # nib.save(nib.Nifti1Image(mask_2, affine, header), out_file_2)
+                        # print(f"    ↳ Par válido ({t_base} -> {t_follow}) -> Generada Máscara 2 (P2)")
                     else:
                         print(f"    ❌ Error de shape entre {t_base} y {t_follow}. Omitiendo Máscara 2.")
                 else:
@@ -100,7 +114,7 @@ def generate_custom_masks(base_dir):
                 print(f"    ℹ️ Nodo final ({t_base}). No se genera Máscara 2.")
 
 # --- EJECUCIÓN ---
-directorios_a_procesar = ['Dataset/MU_glioma/test']
+directorios_a_procesar = ['Dataset/MU_glioma/val']
 
 for directorio in directorios_a_procesar:
     if os.path.exists(directorio):

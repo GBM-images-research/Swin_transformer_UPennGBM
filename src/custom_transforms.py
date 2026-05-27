@@ -65,12 +65,10 @@ class RandModalityDropoutd(MapTransform):
 #######################################################
 # 2. TRANSFORMACIONES DE ETIQUETAS UNIVERSALES (LABELS)
 #######################################################
-
 class ConvertToMultiChannelPipeline1d(MapTransform):
     """
-    Conversor Universal para el PIPELINE 1 (Tumor Core vs Edema Total).
-    Compatible con UPenn-GBM y MU-Glioma Post.
-    Salida: [Canal 0: Tumor Core, Canal 1: Edema Total]
+    PIPELINE 1: Modelo Base (Sólidos Anidados)
+    Salida: [Canal 0: Tumor Core Sólido, Canal 1: Whole Tumor Sólido]
     """
     def __init__(self, keys, allow_missing_keys=False):
         super().__init__(keys, allow_missing_keys)
@@ -79,26 +77,23 @@ class ConvertToMultiChannelPipeline1d(MapTransform):
         d = dict(data)
         for key in self.keys:
             img = d[key]
-            # Si tiene dimensión de canal extra (ej: [1, H, W, D]), comprimir
-            if img.ndim == 4 and img.shape[0] == 1:
-                img = img.squeeze(0)
+            if img.ndim == 4 and img.shape[0] == 1: img = img.squeeze(0)
 
-            # --- Lógica Universal de Clases ---
-            # UPenn: Necrosis=1, Enhancing=4. MU-Glioma P1: Tumor Core=1, Enhancing=3.
+            # 1. El núcleo sólido
             tc = (img == 1) | (img == 4) | (img == 3)
-            # Edema en ambas bases de datos es siempre 2.
-            edema = (img == 2)
             
-            result = [tc, edema]
+            # 2. La masa total sólida (Núcleo + Edema)
+            wt = tc | (img == 2)
+            
+            result = [tc, wt]
             d[key] = torch.stack(result, dim=0).float() if isinstance(img, torch.Tensor) else np.stack(result, axis=0).astype(np.float32)
         return d
 
 
 class ConvertToMultiChannelPipeline2d(MapTransform):
     """
-    Conversor Universal para el PIPELINE 2 (Infiltración vs Edema Vasogénico Puro).
-    Compatible con UPenn-GBM y MU-Glioma Post.
-    Salida: [Canal 0: Infiltración, Canal 1: Edema Puro]
+    Conversor para PIPELINE 2 (Sólidos Anidados Extendidos)
+    Salida: [Canal 0: Target Extendido Sólido, Canal 1: Whole Abnormal Area Sólida]
     """
     def __init__(self, keys, allow_missing_keys=False):
         super().__init__(keys, allow_missing_keys)
@@ -107,18 +102,79 @@ class ConvertToMultiChannelPipeline2d(MapTransform):
         d = dict(data)
         for key in self.keys:
             img = d[key]
-            if img.ndim == 4 and img.shape[0] == 1:
-                img = img.squeeze(0)
+            if img.ndim == 4 and img.shape[0] == 1: img = img.squeeze(0)
 
-            # --- Lógica Universal de Clases ---
-            # UPenn: Infiltración=6. MU-Glioma P2: Infiltración=1.
-            infilt = (img == 1) | (img == 6)
-            # Edema Puro en ambas bases de datos es 2.
-            edema_puro = (img == 2)
+            # 1. Identificar componentes básicos
+            # En MU-Glioma P2 el núcleo ahora es 4. En UPenn el núcleo es 1 o 4.
+            core_base = (img == 4) | (img == 1) | (img == 3) 
             
-            result = [infilt, edema_puro]
+            # La infiltración (1 en MU-Glioma, 6 en UPenn)
+            infilt = (img == 1) | (img == 6)
+
+            # 2. Construir Sólidos Jerárquicos
+            # CANAL 0: Extended Target (Núcleo Original + Infiltración) -> MASA SÓLIDA
+            extended_target = core_base | infilt
+            
+            # CANAL 1: Whole Abnormal Area (Extended Target + Edema Puro) -> MASA SÓLIDA GLOBAL
+            whole_abnormal = extended_target | (img == 2)
+            
+            result = [extended_target, whole_abnormal]
             d[key] = torch.stack(result, dim=0).float() if isinstance(img, torch.Tensor) else np.stack(result, axis=0).astype(np.float32)
         return d
+
+# class ConvertToMultiChannelPipeline1d(MapTransform):
+#     """
+#     Conversor Universal para el PIPELINE 1 (Tumor Core vs Edema Total).
+#     Compatible con UPenn-GBM y MU-Glioma Post.
+#     Salida: [Canal 0: Tumor Core, Canal 1: Edema Total]
+#     """
+#     def __init__(self, keys, allow_missing_keys=False):
+#         super().__init__(keys, allow_missing_keys)
+
+#     def __call__(self, data):
+#         d = dict(data)
+#         for key in self.keys:
+#             img = d[key]
+#             # Si tiene dimensión de canal extra (ej: [1, H, W, D]), comprimir
+#             if img.ndim == 4 and img.shape[0] == 1:
+#                 img = img.squeeze(0)
+
+#             # --- Lógica Universal de Clases ---
+#             # UPenn: Necrosis=1, Enhancing=4. MU-Glioma P1: Tumor Core=1, Enhancing=3.
+#             tc = (img == 1) | (img == 4) | (img == 3)
+#             # Edema en ambas bases de datos es siempre 2.
+#             edema = (img == 2)
+            
+#             result = [tc, edema]
+#             d[key] = torch.stack(result, dim=0).float() if isinstance(img, torch.Tensor) else np.stack(result, axis=0).astype(np.float32)
+#         return d
+
+
+# class ConvertToMultiChannelPipeline2d(MapTransform):
+#     """
+#     Conversor Universal para el PIPELINE 2 (Infiltración vs Edema Vasogénico Puro).
+#     Compatible con UPenn-GBM y MU-Glioma Post.
+#     Salida: [Canal 0: Infiltración, Canal 1: Edema Puro]
+#     """
+#     def __init__(self, keys, allow_missing_keys=False):
+#         super().__init__(keys, allow_missing_keys)
+
+#     def __call__(self, data):
+#         d = dict(data)
+#         for key in self.keys:
+#             img = d[key]
+#             if img.ndim == 4 and img.shape[0] == 1:
+#                 img = img.squeeze(0)
+
+#             # --- Lógica Universal de Clases ---
+#             # UPenn: Infiltración=6. MU-Glioma P2: Infiltración=1.
+#             infilt = (img == 1) | (img == 6)
+#             # Edema Puro en ambas bases de datos es 2.
+#             edema_puro = (img == 2)
+            
+#             result = [infilt, edema_puro]
+#             d[key] = torch.stack(result, dim=0).float() if isinstance(img, torch.Tensor) else np.stack(result, axis=0).astype(np.float32)
+#         return d
 
 
 #######################################################

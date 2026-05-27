@@ -44,8 +44,9 @@ def get_upenn_dicts(root_dir, split="train", pipeline=1):
             if not os.path.exists(label_path): # Respaldo por si se llama diferente
                 label_path = os.path.join(split_dir, "labels", f"{case}_segm.nii.gz")
         else:
-            # Para P2 (Infiltración y Edema Vasogénico Puro)
-            label_path = os.path.join(split_dir, "labels", f"{case}_combined2_approx_segm.nii.gz")
+            # --- LÍNEA CORREGIDA PARA P2 ---
+            # Ahora busca la máscara que nosotros generamos, que contiene toda la topología
+            label_path = os.path.join(split_dir, "labels", f"{case}_tumorMask2_approx_segm.nii.gz")
             
         # 3. Validar existencia y añadir
         if all(os.path.exists(p) for p in image_paths) and os.path.exists(label_path):
