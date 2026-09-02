@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import wandb
 
 from monai.data import DataLoader, decollate_batch
-from monai.losses import DiceLoss, DiceFocalLoss, DiceCELoss
+from monai.losses import DiceCELoss, DiceFocalLoss, DiceLoss # Cambiamos a DiceCELoss para sólidos anidados
 from monai.inferers import sliding_window_inference
 from monai import transforms
 from monai.transforms import AsDiscrete, Activations
@@ -27,7 +27,7 @@ from src.get_data import UnifiedDataset
 from src.custom_transforms import (
     ImputeMissingChannelsd,
     RandModalityDropoutd,
-    ConvertToMultiChannelPipeline2d  # <-- Transformación para Pipeline 2
+    ConvertToMultiChannel3Tier_d  # <-- Transformación Experimento 3-Tier
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -56,7 +56,7 @@ config_train = SimpleNamespace(
     lr=lr,
     weight_decay=weight_decay,
     feature_size=feature_size,
-    pipeline="Pipeline 2: Extended Target vs Whole Abnormal Area", # Actualizado semánticamente
+    pipeline="Experimento Definitivo: 3-Tier Nested Solids", 
     network="SwinUNETR",
     use_v2=use_v2,
 )
@@ -70,7 +70,7 @@ if api_key:
     wandb.login(key=api_key)
 
 run = wandb.init(
-    project="Swin_Unified_Pipeline2",  
+    project="Swin_Unified_Pipeline3_Tier",  # Proyecto separado para no mezclar métricas
     job_type="train", 
     config=config_train
 )
@@ -113,10 +113,10 @@ train_transform = transforms.Compose([
     
     # Unificación y Regularización
     ImputeMissingChannelsd(keys=["image"]),
-    # RandModalityDropoutd(keys=["image"], prob=0.5),
+    RandModalityDropoutd(keys=["image"], prob=0.5),
     
-    # Formateo de Etiquetas PARA PIPELINE 2 (Sólidos Anidados)
-    ConvertToMultiChannelPipeline2d(keys=["label"]),
+    # 3 CANALES SÓLIDOS (Core, Extended, Whole)
+    ConvertToMultiChannel3Tier_d(keys=["label"]),
     
     # --- Recorte y Aumentación Espacial OPTIMIZADOS ---
     transforms.CropForegroundd(
@@ -127,7 +127,6 @@ train_transform = transforms.Compose([
         allow_smaller=False  
     ),
     
-    # Muestreo Balanceado
     transforms.RandCropByPosNegLabeld(
         keys=["image", "label"],
         label_key="label",
@@ -138,7 +137,6 @@ train_transform = transforms.Compose([
         image_key="image",
         image_threshold=0,
     ),
-    # --------------------------------------------------
 
     # Aumentaciones geométricas y de intensidad
     transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
@@ -147,8 +145,7 @@ train_transform = transforms.Compose([
     
     transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),            
     
-    # --- CORRECCIÓN CLÍNICA PARA INFILTRACIÓN SUTIL ---
-    # Probabilidad bajada al 30%, factor bajado al 5%
+    # Variaciones de intensidad sutiles
     transforms.RandScaleIntensityd(keys="image", factors=0.05, prob=0.3),
     transforms.RandShiftIntensityd(keys="image", offsets=0.05, prob=0.3),
 ])
@@ -157,11 +154,9 @@ val_transform = transforms.Compose([
     transforms.LoadImaged(keys=["image", "label"]),
     transforms.EnsureChannelFirstd(keys=["image", "label"]),
     
-    # Unificación de canales (sin dropout en val)
     ImputeMissingChannelsd(keys=["image"]),
-    ConvertToMultiChannelPipeline2d(keys=["label"]),
+    ConvertToMultiChannel3Tier_d(keys=["label"]),
     
-    # Recorte inteligente para sliding window (Mantenido para validación rápida)
     transforms.CropForegroundd(
         keys=["image", "label"], 
         source_key="image",
@@ -182,7 +177,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = SwinUNETR(
     img_size=roi,
     in_channels=11,  
-    out_channels=2,  
+    out_channels=3,  # <--- AHORA SON 3 CANALES DE SALIDA
     feature_size=feature_size,
     drop_rate=0.0,
     attn_drop_rate=0.0,
@@ -191,35 +186,40 @@ model = SwinUNETR(
     use_v2=use_v2,
 )
 
-# TRANSFER LEARNING: Cargar pesos del Pipeline 1
-# model_path = "Dataset_Output/pipe1/colorful-cloud-11/model_best.pt"
-# if os.path.exists(model_path):
-#     loaded_model = torch.load(model_path, map_location=device)["state_dict"]
-#     model.load_state_dict(loaded_model)
-#     print(f"Transfer Learning: Pesos de P1 cargados desde {model_path}")
-# else:
-#     print(f"⚠️ Atención: No se encontró el modelo base en {model_path}. Entrenando desde cero.")
-
 model.to(device)
 
 ###########################
 # OPTIMIZADOR Y PÉRDIDA
 ###########################
 torch.backends.cudnn.benchmark = True
-# dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
 
-# NUEVO: DiceFocalLoss obliga a la red a salir de su "zona de confort"
-# gamma=2.0 es el estándar de oro para enfocar la red en píxeles difíciles.
-# lambda_dice y lambda_focal equilibran ambos castigos.
-dice_loss = DiceFocalLoss(
+# Usamos DiceCELoss. Excelente para fronteras nítidas entre sólidos
+# dice_loss = DiceCELoss(to_onehot_y=False, sigmoid=True)
+
+# Ponderación de canales (Channel Weights):
+# Canal 0 (Tumor Core): Peso 1.0 (Es fácil, ya lo domina)
+# Canal 1 (Extended Target): Peso 5.0 (Aquí está la infiltración, penalización extrema)
+# Canal 2 (Whole Abnormal): Peso 1.0 (Masa global)
+pesos_canales = torch.tensor([1.0, 5.0, 1.0], device=device)
+
+# DiceCELoss permite aplicar ponderaciones para forzar la atención en clases minoritarias
+dice_loss = DiceCELoss(
     to_onehot_y=False, 
-    sigmoid=True, 
-    gamma=2.0, 
-    lambda_dice=1.0, 
-    lambda_focal=1.0
+    sigmoid=True,
+    lambda_dice=1.0,
+    lambda_ce=1.0,
+    weight=pesos_canales  # Multiplica el error del CE para empujar los bordes
 )
 
-# dice_loss = DiceCELoss(to_onehot_y=False, sigmoid=True)
+# dice_loss = DiceFocalLoss(
+#     to_onehot_y=False, 
+#     sigmoid=True, 
+#     gamma=2.0, 
+#     lambda_dice=1.0, 
+#     lambda_focal=1.0
+# )
+
+# dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
 
 post_sigmoid = Activations(sigmoid=True)
 post_pred = AsDiscrete(argmax=False, threshold=0.5)
@@ -252,7 +252,6 @@ def train_epoch(model, loader, optimizer, epoch, loss_func):
         optimizer.step()
         optimizer.zero_grad() 
         
-        # Corrección: data.shape[0] para robustez del batch
         run_loss.update(loss.item(), n=data.shape[0])
         print("Epoch {}/{} {}/{} loss: {:.4f} time {:.2f}s".format(
             epoch, max_epochs, idx, len(loader), run_loss.avg, time.time() - start_time))
@@ -271,18 +270,48 @@ def val_epoch(model, loader, epoch, acc_func, model_inferer, post_sigmoid, post_
             
             val_labels_list = decollate_batch(target)
             val_outputs_list = decollate_batch(logits)
+            
+            # Pasamos la sigmoide y el threshold (convertimos a 0 o 1)
             val_output_convert = [post_pred(post_sigmoid(val_pred_tensor)) for val_pred_tensor in val_outputs_list]
             
+            # --- LA EXTRACCIÓN TOPOLÓGICA (POST-PROCESAMIENTO) ---
+            pred_finales = []
+            labels_finales = []
+            
+            for i in range(len(val_output_convert)):
+                # Convertimos a tensores booleanos para aplicar operadores lógicos limpios
+                pred = val_output_convert[i].bool()     # Forma: [3, H, W, D]
+                label_gt = val_labels_list[i].bool()    # Forma: [3, H, W, D]
+                
+                # 1. Extracción Lógica de la Predicción
+                pred_tc_solido = pred[0]
+                pred_infilt_pura = pred[1] & (~pred[0])  # Anillo Infiltración
+                pred_edema_puro = pred[2] & (~pred[1])   # Anillo Edema
+                
+                # 2. Extracción Lógica del Ground Truth
+                gt_tc_solido = label_gt[0]
+                gt_infilt_pura = label_gt[1] & (~label_gt[0])
+                gt_edema_puro = label_gt[2] & (~label_gt[1])
+                
+                # Apilamos y convertimos de nuevo a float para que DiceMetric no se queje
+                pred_eval = torch.stack([pred_tc_solido, pred_infilt_pura, pred_edema_puro]).float()
+                gt_eval = torch.stack([gt_tc_solido, gt_infilt_pura, gt_edema_puro]).float()
+                
+                pred_finales.append(pred_eval)
+                labels_finales.append(gt_eval)
+            
             acc_func.reset()
-            acc_func(y_pred=val_output_convert, y=val_labels_list)
+            acc_func(y_pred=pred_finales, y=labels_finales)
             acc, not_nans = acc_func.aggregate()
             run_acc.update(acc.cpu().numpy(), n=not_nans.cpu().numpy())
             
-            # --- Corrección Semántica de Variables (Sólidos Anidados P2) ---
-            dice_ext_target = run_acc.avg[0]    # Canal 0: Extended Target (Core + Infilt)
-            dice_whole_abnormal = run_acc.avg[1] # Canal 1: Whole Abnormal Area
-            print("Val {}/{} {}/{} , dice_ext_target: {:.4f} , dice_whole_abnormal: {:.4f} , time {:.2f}s".format(
-                epoch, max_epochs, idx, len(loader), dice_ext_target, dice_whole_abnormal, time.time() - start_time))
+            # --- Lectura de las nuevas métricas aisladas ---
+            dice_tc = run_acc.avg[0]
+            dice_infilt_calculada = run_acc.avg[1]
+            dice_edema_puro = run_acc.avg[2]
+            
+            print("Val {}/{} {}/{} , dice_tc: {:.4f} , dice_infilt: {:.4f} , dice_edema: {:.4f} , time {:.2f}s".format(
+                epoch, max_epochs, idx, len(loader), dice_tc, dice_infilt_calculada, dice_edema_puro, time.time() - start_time))
             start_time = time.time()
     return run_acc.avg
 
@@ -306,17 +335,19 @@ def trainer(model, train_loader, val_loader, optimizer, loss_func, acc_func, sch
             epoch_time = time.time()
             val_acc = val_epoch(model, val_loader, epoch, acc_func, model_inferer, post_sigmoid, post_pred)
             
-            dice_ext_target = val_acc[0]
-            dice_whole_abnormal = val_acc[1]
+            dice_tc = val_acc[0]
+            dice_infilt_calculada = val_acc[1]
+            dice_edema_puro = val_acc[2]
             val_avg_acc = np.mean(val_acc)
             
-            print("Final validation stats {}/{} , dice_ext_target: {:.4f} , dice_whole_abnormal: {:.4f} , Dice_Avg: {:.4f} , time {:.2f}s".format(
-                epoch, max_epochs - 1, dice_ext_target, dice_whole_abnormal, val_avg_acc, time.time() - epoch_time))
+            print("Final validation stats {}/{} , dice_tc: {:.4f} , dice_infilt: {:.4f} , dice_edema: {:.4f} , Dice_Avg: {:.4f} , time {:.2f}s".format(
+                epoch, max_epochs - 1, dice_tc, dice_infilt_calculada, dice_edema_puro, val_avg_acc, time.time() - epoch_time))
             
-            # --- Actualización WandB ---
+            # --- Actualización WandB con las 3 clases desglosadas ---
             wandb.log({
-                "val_dice_ext_target": dice_ext_target,
-                "val_dice_whole_abnormal": dice_whole_abnormal,
+                "val_dice_tc_solid": dice_tc,
+                "val_dice_infilt_pura": dice_infilt_calculada,
+                "val_dice_edema_puro": dice_edema_puro,
                 "val_dice_avg": val_avg_acc,
             })
             
@@ -333,7 +364,7 @@ def trainer(model, train_loader, val_loader, optimizer, loss_func, acc_func, sch
     
     # Save artifact in W&B
     if wandb.run is not None:
-        artifact_name = f"{wandb.run.id}_best_model_p2"
+        artifact_name = f"{wandb.run.id}_best_model_3tier"
         at = wandb.Artifact(artifact_name, type="model")
         at.add_file(os.path.join(directory, "model_best.pt"))
         wandb.log_artifact(at, aliases=["final"])
@@ -344,12 +375,11 @@ def trainer(model, train_loader, val_loader, optimizer, loss_func, acc_func, sch
 # Carga de Datos y Ejecución
 ####################################
 def main(config_train):
-    # Ajustar a las rutas del Pipeline 2
     UPENN_DIR = "./Dataset/Dataset_30_6/"
     MUGLIOMA_DIR = "./Dataset/MU_glioma/"
     PIPELINE = 2 
 
-    print(f"\n--- INICIANDO CARGA PARA PIPELINE {PIPELINE} ---")
+    print(f"\n--- INICIANDO CARGA PARA PIPELINE {PIPELINE} (3-TIER) ---")
     train_set = UnifiedDataset(
         upenn_dir=UPENN_DIR, 
         muglioma_dir=MUGLIOMA_DIR, 

@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import wandb
 
 from monai.data import DataLoader, decollate_batch
-from monai.losses import DiceLoss, DiceFocalLoss, DiceCELoss
+from monai.losses import DiceLoss, DiceFocalLoss
 from monai.inferers import sliding_window_inference
 from monai import transforms
 from monai.transforms import AsDiscrete, Activations
@@ -27,7 +27,7 @@ from src.get_data import UnifiedDataset
 from src.custom_transforms import (
     ImputeMissingChannelsd,
     RandModalityDropoutd,
-    ConvertToMultiChannelPipeline2d  # <-- Transformación para Pipeline 2
+    ConvertToMultiChannelPipeline2_Experimento_d  # <-- Transformación para Pipeline 2 experimento          
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -56,7 +56,7 @@ config_train = SimpleNamespace(
     lr=lr,
     weight_decay=weight_decay,
     feature_size=feature_size,
-    pipeline="Pipeline 2: Extended Target vs Whole Abnormal Area", # Actualizado semánticamente
+    pipeline="Experimento P2: Infiltración Pura + Core Anchor", # Actualizado semánticamente
     network="SwinUNETR",
     use_v2=use_v2,
 )
@@ -113,10 +113,10 @@ train_transform = transforms.Compose([
     
     # Unificación y Regularización
     ImputeMissingChannelsd(keys=["image"]),
-    # RandModalityDropoutd(keys=["image"], prob=0.5),
+    RandModalityDropoutd(keys=["image"], prob=0.5),
     
     # Formateo de Etiquetas PARA PIPELINE 2 (Sólidos Anidados)
-    ConvertToMultiChannelPipeline2d(keys=["label"]),
+    ConvertToMultiChannelPipeline2_Experimento_d(keys=["label"]),
     
     # --- Recorte y Aumentación Espacial OPTIMIZADOS ---
     transforms.CropForegroundd(
@@ -159,7 +159,7 @@ val_transform = transforms.Compose([
     
     # Unificación de canales (sin dropout en val)
     ImputeMissingChannelsd(keys=["image"]),
-    ConvertToMultiChannelPipeline2d(keys=["label"]),
+    ConvertToMultiChannelPipeline2_Experimento_d(keys=["label"]),
     
     # Recorte inteligente para sliding window (Mantenido para validación rápida)
     transforms.CropForegroundd(
@@ -192,13 +192,13 @@ model = SwinUNETR(
 )
 
 # TRANSFER LEARNING: Cargar pesos del Pipeline 1
-# model_path = "Dataset_Output/pipe1/colorful-cloud-11/model_best.pt"
-# if os.path.exists(model_path):
-#     loaded_model = torch.load(model_path, map_location=device)["state_dict"]
-#     model.load_state_dict(loaded_model)
-#     print(f"Transfer Learning: Pesos de P1 cargados desde {model_path}")
-# else:
-#     print(f"⚠️ Atención: No se encontró el modelo base en {model_path}. Entrenando desde cero.")
+model_path = "Dataset_Output/pipe1/colorful-cloud-11/model_best.pt"
+if os.path.exists(model_path):
+    loaded_model = torch.load(model_path, map_location=device)["state_dict"]
+    model.load_state_dict(loaded_model)
+    print(f"Transfer Learning: Pesos de P1 cargados desde {model_path}")
+else:
+    print(f"⚠️ Atención: No se encontró el modelo base en {model_path}. Entrenando desde cero.")
 
 model.to(device)
 
@@ -218,8 +218,6 @@ dice_loss = DiceFocalLoss(
     lambda_dice=1.0, 
     lambda_focal=1.0
 )
-
-# dice_loss = DiceCELoss(to_onehot_y=False, sigmoid=True)
 
 post_sigmoid = Activations(sigmoid=True)
 post_pred = AsDiscrete(argmax=False, threshold=0.5)
@@ -278,11 +276,11 @@ def val_epoch(model, loader, epoch, acc_func, model_inferer, post_sigmoid, post_
             acc, not_nans = acc_func.aggregate()
             run_acc.update(acc.cpu().numpy(), n=not_nans.cpu().numpy())
             
-            # --- Corrección Semántica de Variables (Sólidos Anidados P2) ---
-            dice_ext_target = run_acc.avg[0]    # Canal 0: Extended Target (Core + Infilt)
-            dice_whole_abnormal = run_acc.avg[1] # Canal 1: Whole Abnormal Area
-            print("Val {}/{} {}/{} , dice_ext_target: {:.4f} , dice_whole_abnormal: {:.4f} , time {:.2f}s".format(
-                epoch, max_epochs, idx, len(loader), dice_ext_target, dice_whole_abnormal, time.time() - start_time))
+            # --- Corrección Semántica (Experimento Ablación) ---
+            dice_infilt_pura = run_acc.avg[0]    # Canal 0: Infiltración Pura (Dona)
+            dice_core_anchor = run_acc.avg[1]    # Canal 1: Tumor Core (Ancla Sólida)
+            print("Val {}/{} {}/{} , dice_infilt_pura: {:.4f} , dice_core_anchor: {:.4f} , time {:.2f}s".format(
+                epoch, max_epochs, idx, len(loader), dice_infilt_pura, dice_core_anchor, time.time() - start_time))
             start_time = time.time()
     return run_acc.avg
 
@@ -306,17 +304,17 @@ def trainer(model, train_loader, val_loader, optimizer, loss_func, acc_func, sch
             epoch_time = time.time()
             val_acc = val_epoch(model, val_loader, epoch, acc_func, model_inferer, post_sigmoid, post_pred)
             
-            dice_ext_target = val_acc[0]
-            dice_whole_abnormal = val_acc[1]
+            dice_infilt_pura = val_acc[0]
+            dice_core_anchor = val_acc[1]
             val_avg_acc = np.mean(val_acc)
             
-            print("Final validation stats {}/{} , dice_ext_target: {:.4f} , dice_whole_abnormal: {:.4f} , Dice_Avg: {:.4f} , time {:.2f}s".format(
-                epoch, max_epochs - 1, dice_ext_target, dice_whole_abnormal, val_avg_acc, time.time() - epoch_time))
+            print("Final validation stats {}/{} , dice_infilt_pura: {:.4f} , dice_core_anchor: {:.4f} , Dice_Avg: {:.4f} , time {:.2f}s".format(
+                epoch, max_epochs - 1, dice_infilt_pura, dice_core_anchor, val_avg_acc, time.time() - epoch_time))
             
             # --- Actualización WandB ---
             wandb.log({
-                "val_dice_ext_target": dice_ext_target,
-                "val_dice_whole_abnormal": dice_whole_abnormal,
+                "val_dice_infilt_pura": dice_infilt_pura,
+                "val_dice_core_anchor": dice_core_anchor,
                 "val_dice_avg": val_avg_acc,
             })
             

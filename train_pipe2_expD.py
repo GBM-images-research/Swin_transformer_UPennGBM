@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import wandb
 
 from monai.data import DataLoader, decollate_batch
-from monai.losses import DiceLoss, DiceFocalLoss, DiceCELoss
+from monai.losses import DiceLoss, DiceFocalLoss
 from monai.inferers import sliding_window_inference
 from monai import transforms
 from monai.transforms import AsDiscrete, Activations
@@ -27,7 +27,7 @@ from src.get_data import UnifiedDataset
 from src.custom_transforms import (
     ImputeMissingChannelsd,
     RandModalityDropoutd,
-    ConvertToMultiChannelPipeline2d  # <-- Transformación para Pipeline 2
+    ConvertToMultiChannelPipeline2_ExperimentoD_d  # <-- Transformación para Experimento D         
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -56,7 +56,7 @@ config_train = SimpleNamespace(
     lr=lr,
     weight_decay=weight_decay,
     feature_size=feature_size,
-    pipeline="Pipeline 2: Extended Target vs Whole Abnormal Area", # Actualizado semánticamente
+    pipeline="Experimento D: Infiltración Pura vs Edema Vasogénico Puro", # Actualizado semánticamente
     network="SwinUNETR",
     use_v2=use_v2,
 )
@@ -115,8 +115,8 @@ train_transform = transforms.Compose([
     ImputeMissingChannelsd(keys=["image"]),
     # RandModalityDropoutd(keys=["image"], prob=0.5),
     
-    # Formateo de Etiquetas PARA PIPELINE 2 (Sólidos Anidados)
-    ConvertToMultiChannelPipeline2d(keys=["label"]),
+    # Formateo de Etiquetas PARA EXPERIMENTO D
+    ConvertToMultiChannelPipeline2_ExperimentoD_d(keys=["label"]),
     
     # --- Recorte y Aumentación Espacial OPTIMIZADOS ---
     transforms.CropForegroundd(
@@ -148,7 +148,6 @@ train_transform = transforms.Compose([
     transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),            
     
     # --- CORRECCIÓN CLÍNICA PARA INFILTRACIÓN SUTIL ---
-    # Probabilidad bajada al 30%, factor bajado al 5%
     transforms.RandScaleIntensityd(keys="image", factors=0.05, prob=0.3),
     transforms.RandShiftIntensityd(keys="image", offsets=0.05, prob=0.3),
 ])
@@ -159,9 +158,9 @@ val_transform = transforms.Compose([
     
     # Unificación de canales (sin dropout en val)
     ImputeMissingChannelsd(keys=["image"]),
-    ConvertToMultiChannelPipeline2d(keys=["label"]),
+    ConvertToMultiChannelPipeline2_ExperimentoD_d(keys=["label"]),
     
-    # Recorte inteligente para sliding window (Mantenido para validación rápida)
+    # Recorte inteligente para sliding window
     transforms.CropForegroundd(
         keys=["image", "label"], 
         source_key="image",
@@ -206,11 +205,8 @@ model.to(device)
 # OPTIMIZADOR Y PÉRDIDA
 ###########################
 torch.backends.cudnn.benchmark = True
-# dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
 
-# NUEVO: DiceFocalLoss obliga a la red a salir de su "zona de confort"
-# gamma=2.0 es el estándar de oro para enfocar la red en píxeles difíciles.
-# lambda_dice y lambda_focal equilibran ambos castigos.
+# DiceFocalLoss obliga a la red a salir de su "zona de confort"
 dice_loss = DiceFocalLoss(
     to_onehot_y=False, 
     sigmoid=True, 
@@ -218,8 +214,6 @@ dice_loss = DiceFocalLoss(
     lambda_dice=1.0, 
     lambda_focal=1.0
 )
-
-# dice_loss = DiceCELoss(to_onehot_y=False, sigmoid=True)
 
 post_sigmoid = Activations(sigmoid=True)
 post_pred = AsDiscrete(argmax=False, threshold=0.5)
@@ -252,7 +246,6 @@ def train_epoch(model, loader, optimizer, epoch, loss_func):
         optimizer.step()
         optimizer.zero_grad() 
         
-        # Corrección: data.shape[0] para robustez del batch
         run_loss.update(loss.item(), n=data.shape[0])
         print("Epoch {}/{} {}/{} loss: {:.4f} time {:.2f}s".format(
             epoch, max_epochs, idx, len(loader), run_loss.avg, time.time() - start_time))
@@ -278,11 +271,11 @@ def val_epoch(model, loader, epoch, acc_func, model_inferer, post_sigmoid, post_
             acc, not_nans = acc_func.aggregate()
             run_acc.update(acc.cpu().numpy(), n=not_nans.cpu().numpy())
             
-            # --- Corrección Semántica de Variables (Sólidos Anidados P2) ---
-            dice_ext_target = run_acc.avg[0]    # Canal 0: Extended Target (Core + Infilt)
-            dice_whole_abnormal = run_acc.avg[1] # Canal 1: Whole Abnormal Area
-            print("Val {}/{} {}/{} , dice_ext_target: {:.4f} , dice_whole_abnormal: {:.4f} , time {:.2f}s".format(
-                epoch, max_epochs, idx, len(loader), dice_ext_target, dice_whole_abnormal, time.time() - start_time))
+            # --- Corrección Semántica (Experimento D) ---
+            dice_infilt_pura = run_acc.avg[0]    # Canal 0: Infiltración Pura
+            dice_edema = run_acc.avg[1]          # Canal 1: Edema Vasogénico Puro
+            print("Val {}/{} {}/{} , dice_infilt_pura: {:.4f} , dice_edema: {:.4f} , time {:.2f}s".format(
+                epoch, max_epochs, idx, len(loader), dice_infilt_pura, dice_edema, time.time() - start_time))
             start_time = time.time()
     return run_acc.avg
 
@@ -306,17 +299,17 @@ def trainer(model, train_loader, val_loader, optimizer, loss_func, acc_func, sch
             epoch_time = time.time()
             val_acc = val_epoch(model, val_loader, epoch, acc_func, model_inferer, post_sigmoid, post_pred)
             
-            dice_ext_target = val_acc[0]
-            dice_whole_abnormal = val_acc[1]
+            dice_infilt_pura = val_acc[0]
+            dice_edema = val_acc[1]
             val_avg_acc = np.mean(val_acc)
             
-            print("Final validation stats {}/{} , dice_ext_target: {:.4f} , dice_whole_abnormal: {:.4f} , Dice_Avg: {:.4f} , time {:.2f}s".format(
-                epoch, max_epochs - 1, dice_ext_target, dice_whole_abnormal, val_avg_acc, time.time() - epoch_time))
+            print("Final validation stats {}/{} , dice_infilt_pura: {:.4f} , dice_edema: {:.4f} , Dice_Avg: {:.4f} , time {:.2f}s".format(
+                epoch, max_epochs - 1, dice_infilt_pura, dice_edema, val_avg_acc, time.time() - epoch_time))
             
             # --- Actualización WandB ---
             wandb.log({
-                "val_dice_ext_target": dice_ext_target,
-                "val_dice_whole_abnormal": dice_whole_abnormal,
+                "val_dice_infilt_pura": dice_infilt_pura,
+                "val_dice_edema": dice_edema,
                 "val_dice_avg": val_avg_acc,
             })
             
@@ -344,12 +337,11 @@ def trainer(model, train_loader, val_loader, optimizer, loss_func, acc_func, sch
 # Carga de Datos y Ejecución
 ####################################
 def main(config_train):
-    # Ajustar a las rutas del Pipeline 2
     UPENN_DIR = "./Dataset/Dataset_30_6/"
     MUGLIOMA_DIR = "./Dataset/MU_glioma/"
     PIPELINE = 2 
 
-    print(f"\n--- INICIANDO CARGA PARA PIPELINE {PIPELINE} ---")
+    print(f"\n--- INICIANDO CARGA PARA EXPERIMENTO D ---")
     train_set = UnifiedDataset(
         upenn_dir=UPENN_DIR, 
         muglioma_dir=MUGLIOMA_DIR, 

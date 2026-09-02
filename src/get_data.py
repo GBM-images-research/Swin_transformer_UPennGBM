@@ -101,7 +101,51 @@ def get_muglioma_dicts(root_dir, split="train", pipeline=1):
                 
     return dicts
 
+def get_ucsd_dicts(root_dir, split="train", pipeline=1):
+    """
+    Rastrea el dataset UCSD-PTGBM y devuelve una lista de diccionarios.
+    Carga los 11 canales densos y 2 máscaras de GT (BraTS + NECT).
+    """
+    dicts = []
+    # La carpeta split podría ser "UCSD-PTGBM-BraTS-2024-test-set" o la de entrenamiento
+    split_dir = os.path.join(root_dir, split) 
+    
+    if not os.path.exists(split_dir):
+        return dicts
 
+    cases = sorted([d for d in os.listdir(split_dir) if os.path.isdir(os.path.join(split_dir, d))])
+    
+    for case in cases:
+        base_path = os.path.join(split_dir, case, f"{case}_")
+        
+        # 1. Los 11 canales mapeados al orden UPenn
+        image_paths = [
+            f"{base_path}CBV_LC.nii.gz",       # 0: DSC rCBV (Equivalente)
+            f"{base_path}CBF_svd.nii.gz",      # 1: DSC PH (Sustituto)
+            f"{base_path}MTT_svd.nii.gz",      # 2: DSC PSR (Sustituto)
+            f"{base_path}RSI_Cell.nii.gz",     # 3: DTI AD (Sustituto de celularidad)
+            f"{base_path}RSI_Free.nii.gz",     # 4: DTI FA (Sustituto de agua libre)
+            f"{base_path}RSI_Hindered.nii.gz", # 5: DTI RD (Sustituto de obstaculización)
+            f"{base_path}ADC_vendor.nii.gz",   # 6: DTI TR (Equivalente matemático)
+            f"{base_path}FLAIR.nii.gz",        # 7: Estructural
+            f"{base_path}T1pre.nii.gz",        # 8: Estructural
+            f"{base_path}T1post.nii.gz",       # 9: Estructural
+            f"{base_path}T2.nii.gz"            # 10: Estructural
+        ]
+        
+        # 2. Cargamos las dos máscaras maestras
+        label_brats = f"{base_path}BraTS_tumor_seg.nii.gz"
+        label_nect = f"{base_path}non_enhancing_cellular_tumor_seg.nii.gz"
+        
+        # 3. Validar existencia y empaquetar
+        if all(os.path.exists(p) for p in image_paths) and os.path.exists(label_brats) and os.path.exists(label_nect):
+            dicts.append({
+                "image": image_paths, 
+                "label": [label_brats, label_nect], # MONAI lo cargará como shape (2, H, W, D)
+                "source": "UCSD"
+            })
+            
+    return dicts
 class UnifiedDataset(Dataset):
     """
     Clase unificada que hereda de monai.data.Dataset.
